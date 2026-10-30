@@ -19,9 +19,7 @@ static const IfsUfsModuleV1 api = {
 };
 const IfsUfsModuleV1 *infiltrator_filesystem_ufs_v1(void) { return &api; }
 static int accepts_volume(const char *path) {
-    LdUfsSummary summary;
-    char error[256] = {0};
-    return path && ufs_read_summary(path, &summary, error, sizeof(error)) == 0 ? 0 : -1;
+    return path && ufs_probe(path) ? 0 : -1;
 }
 static const IfsUfsProbeV1 probe = {
     IFS_UFS_PROBE_ABI_V1, sizeof(IfsUfsProbeV1), "ufs1", accepts_volume
