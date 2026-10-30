@@ -1,0 +1,23 @@
+name: UFS1 independent shared object
+on:
+  push:
+    branches: [main]
+  pull_request:
+jobs:
+  ufs1:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install native dependencies
+        run: sudo apt-get update && sudo apt-get install -y cmake build-essential libssl-dev
+      - name: Build and test UFS1.so
+        run: |
+          cmake -S . -B build -DCMAKE_BUILD_TYPE=Release -DBUILD_TESTING=ON
+          cmake --build build --parallel 2
+          ctest --test-dir build --output-on-failure
+          test -f build/UFS1.so
+          nm -D build/UFS1.so | grep -F infiltrator_filesystem_ufs_v1
+      - uses: actions/upload-artifact@v4
+        with:
+          name: UFS1-so
+          path: build/UFS1.so
