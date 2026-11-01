@@ -34,3 +34,7 @@ if(BUILD_TESTING)
  add_test(NAME ufs1-module-interface COMMAND ufs1-module-test)
 endif()
 install(TARGETS ufs1-driver LIBRARY DESTINATION /System/Filesystems)
+
+# One independent runtime module and one illustrated guide. Source headers are not installed.
+install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/docs/UFS1.pdf"
+        DESTINATION /System/Resources/Documentation/Filesystem-UFS1)
