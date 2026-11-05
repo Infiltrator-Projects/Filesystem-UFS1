@@ -56,7 +56,7 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/download-artifact@v4
         with:
-          name: native-filesystem-release
+          name: ufs1-native-installers
           path: dist
       - name: Prepare the pinned Linux build
         shell: bash
@@ -97,7 +97,7 @@ jobs:
           path: build/qualified/*
           if-no-files-found: error
   publish:
-    needs: qualify
+    needs: [qualify, kernel]
     if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     permissions:
@@ -108,17 +108,27 @@ jobs:
         with:
           name: ufs1-native-installers
           path: dist
+      - uses: actions/download-artifact@v4
+        with:
+          name: qualified-kernel-package
+          path: kernel-qualified
+      - name: Include the qualified kernel module
+        run: |
+          set -euo pipefail
+          install -m 0644 kernel-qualified/*.deb dist/
+          install -m 0644 kernel-qualified/*.ko dist/
+          python3 standalone/check-package.py dist/*.deb --profile portable --kernel-release 6.12.107
       - name: Publish only verified immutable release
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           set -euo pipefail
           tag="v$(tr -d '\r\n' < VERSION)"
-          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 2
+          test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 3
           if gh release view "$tag" >/dev/null 2>&1; then
             echo "Existing immutable release retained"
             exit 0
           fi
           gh release create "$tag" dist/*.deb dist/*.run dist/*.ko --target "$GITHUB_SHA" \
             --title "UFS1 experimental module $tag" \
-            --notes "Independent UFS1.so, one illustrated PDF, and pinned-source CPU-native RUN. Built with the exact embedded Libraries/Common source. Real-media mutation, defrag and recovery qualification is pending; not certified production-safe."
+            --notes "Independent UFS1.so, generated PDF, qualified ufs1.ko and source-embedded native RUN. Built with the exact embedded Libraries/Common source. Real-media mutation, defrag and recovery qualification is pending; not certified production-safe."
