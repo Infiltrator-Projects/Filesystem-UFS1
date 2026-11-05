@@ -1,74 +1,159 @@
-%PDF-1.3
-%“Œ‹ž ReportLab Generated PDF document (opensource)
+%PDF-1.4
+%âãÏÓ
 1 0 obj
-<<
-/F1 2 0 R /F2 3 0 R
->>
+<< /Type /Catalog /Pages 2 0 R >>
 endobj
 2 0 obj
-<<
-/BaseFont /Helvetica /Encoding /WinAnsiEncoding /Name /F1 /Subtype /Type1 /Type /Font
->>
+<< /Type /Pages /Kids [6 0 R 8 0 R] /Count 2 >>
 endobj
 3 0 obj
-<<
-/BaseFont /Helvetica-Bold /Encoding /WinAnsiEncoding /Name /F2 /Subtype /Type1 /Type /Font
->>
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
 endobj
 4 0 obj
-<<
-/Contents 8 0 R /MediaBox [ 0 0 595.2756 841.8898 ] /Parent 7 0 R /Resources <<
-/Font 1 0 R /ProcSet [ /PDF /Text /ImageB /ImageC /ImageI ]
->> /Rotate 0 /Trans <<
-
->> 
-  /Type /Page
->>
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica-Bold >>
 endobj
 5 0 obj
-<<
-/PageMode /UseNone /Pages 7 0 R /Type /Catalog
->>
+<< /Type /Font /Subtype /Type1 /BaseFont /Courier >>
 endobj
 6 0 obj
-<<
-/Author (anonymous) /CreationDate (D:20261101110924+00'00') /Creator (anonymous) /Keywords () /ModDate (D:20261101110924+00'00') /Producer (ReportLab PDF Library - \(opensource\)) 
-  /Subject (unspecified) /Title (UFS1 - Infiltrator filesystem capability guide) /Trapped /False
->>
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 7 0 R >>
 endobj
 7 0 obj
-<<
-/Count 1 /Kids [ 4 0 R ] /Type /Pages
->>
+<< /Length 3377 >>
+stream
+1 0 0 1 0 0 cm  BT /F1 12 Tf 14.4 TL ET
+BT /F2 21 Tf 25.2 TL ET
+BT 1 0 0 1 48 776.8898 Tm (UFS1  |  Unix File System, version 1) Tj T* ET
+BT /F1 11 Tf 13.2 TL ET
+BT 1 0 0 1 48 753.8898 Tm (InfiltratorOS independent filesystem shared-object module) Tj T* ET
+1 w
+n 48 737.8898 m 547.2756 737.8898 l S
+BT /F2 13 Tf 15.6 TL ET
+BT 1 0 0 1 48 704.8898 Tm (How it fits together) Tj T* ET
+n
+55 632.8898 m
+186 632.8898 l
+189.8696 632.8898 193 636.0202 193 639.8898 c
+193 672.8898 l
+193 676.7594 189.8696 679.8898 186 679.8898 c
+55 679.8898 l
+51.1304 679.8898 48 676.7594 48 672.8898 c
+48 639.8898 l
+48 636.0202 51.1304 632.8898 55 632.8898 c
+h
+S
+BT /F2 12 Tf 14.4 TL ET
+BT 1 0 0 1 86.156 650.8898 Tm (UFS1 media) Tj T* ET
+n
+227 632.8898 m
+358 632.8898 l
+361.8696 632.8898 365 636.0202 365 639.8898 c
+365 672.8898 l
+365 676.7594 361.8696 679.8898 358 679.8898 c
+227 679.8898 l
+223.1304 679.8898 220 676.7594 220 672.8898 c
+220 639.8898 l
+220 636.0202 223.1304 632.8898 227 632.8898 c
+h
+S
+BT /F2 12 Tf 14.4 TL ET
+BT 1 0 0 1 268.494 650.8898 Tm (UFS1.so) Tj T* ET
+n
+403 632.8898 m
+534 632.8898 l
+537.8696 632.8898 541 636.0202 541 639.8898 c
+541 672.8898 l
+541 676.7594 537.8696 679.8898 534 679.8898 c
+403 679.8898 l
+399.1304 679.8898 396 676.7594 396 672.8898 c
+396 639.8898 l
+396 636.0202 399.1304 632.8898 403 632.8898 c
+h
+S
+BT /F2 12 Tf 14.4 TL ET
+BT 1 0 0 1 429.482 650.8898 Tm (Host services) Tj T* ET
+1.5 w
+n 194 656.8898 m 214 656.8898 l S
+n 208 661.8898 m 214 656.8898 l S
+n 208 651.8898 m 214 656.8898 l S
+n 370 656.8898 m 390 656.8898 l S
+n 384 661.8898 m 390 656.8898 l S
+n 384 651.8898 m 390 656.8898 l S
+BT /F1 10 Tf 12 TL ET
+BT 1 0 0 1 48 605.8898 Tm (An independent module recognises UFS1 and rejects UFS2-format media.) Tj T* ET
+BT /F2 13 Tf 15.6 TL ET
+BT 1 0 0 1 48 559.8898 Tm (What is implemented) Tj T* ET
+BT /F1 10.6 Tf 12.72 TL ET
+BT 1 0 0 1 57 536.8898 Tm (- UFS1 identity and format probe, including endian-specific handling.) Tj T* ET
+BT /F1 10.6 Tf 12.72 TL ET
+BT 1 0 0 1 57 515.8898 Tm (- Native analysis and host-service interface for filesystem operations.) Tj T* ET
+BT /F1 10.6 Tf 12.72 TL ET
+BT 1 0 0 1 57 494.8898 Tm (- Dedicated UFS1.so; no UFS2 formatter or UFS2-only verifier is shipped.) Tj T* ET
+BT /F2 13 Tf 15.6 TL ET
+BT 1 0 0 1 48 450.8898 Tm (Important qualification limits) Tj T* ET
+BT /F1 10.6 Tf 12.72 TL ET
+BT 1 0 0 1 57 427.8898 Tm (- Independent real-media and power-failure validation is incomplete.) Tj T* ET
+BT /F1 10.6 Tf 12.72 TL ET
+BT 1 0 0 1 57 406.8898 Tm (- Defrag, Growth Defrag and Recover must not be claimed production-safe yet.) Tj T* ET
+BT /F1 10.6 Tf 12.72 TL ET
+BT 1 0 0 1 57 385.8898 Tm (- Do not use destructive operations on valuable disks based only on this package.) Tj T* ET
+BT /F2 13 Tf 15.6 TL ET
+BT 1 0 0 1 48 343.8898 Tm (Installation) Tj T* ET
+BT /F1 10.6 Tf 12.72 TL ET
+BT 1 0 0 1 57 319.8898 Tm (- Portable .deb: pre-built x86-64 UFS1.so plus this illustrated PDF.) Tj T* ET
+BT /F1 10.6 Tf 12.72 TL ET
+BT 1 0 0 1 57 298.8898 Tm (- Native .run: verifies embedded source, builds on this CPU, and installs a .deb.) Tj T* ET
+BT /F1 10.6 Tf 12.72 TL ET
+BT 1 0 0 1 57 277.8898 Tm (- Installed runtime files: /System/Filesystems/UFS1.so and this PDF only.) Tj T* ET
+BT /F1 9 Tf 10.8 TL ET
+BT 1 0 0 1 48 55 Tm (Infiltrator Projects   |   UFS1 standalone module   |   Experimental, not production-qualified) Tj T* ET
+ 
+endstream
 endobj
 8 0 obj
-<<
-/Filter [ /ASCII85Decode /FlateDecode ] /Length 1424
->>
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 3 0 R /F2 4 0 R /F3 5 0 R >> >> /Contents 9 0 R >>
+endobj
+9 0 obj
+<< /Length 2167 >>
 stream
-Gat=k9lK&M&;KZQ'm"2L=:luZ+6fbA2Ve@%)`/%NVBn:cXsC$AP\bmKnJtMj8NG(6C)AWe'KPd1_r4E=&E8Jtn"L$]FT[sh":0_+%S.SXYk\AbCfY_L![VHKZ@KN+1:`2s8CJj*Z93b6%6lu1g_54A!"Y(e!]RCtE;uYZ;.%,&kd4:uO<7p&#rY!g,%+q#JOFEF@$-@dg[&J$GJ%#5?hY\4;R?M?RN?EQBH%BPSp-o6X6h93oMDT/W.YtQ_"4S2StgE">Q]o5J>Ol;@hmeF#Y8J0Z62.Z0T;R<O6RUY;:B=EeYD@&U@VhQ/&i]gkS/50ZG`.GRX'u@\Mm"K#`U)8Bh0Tr+.j5tCSl!S23T.oGmqts3mG.-d_fOhA%&BP,6<Y<fF;7q#@I0`SJN1p3\7Yh,k'Z%(@UEiXS+/7oL,t/7'e-]\.K#TNs_p'V;r#MPbpXgLh/co-m;)7UP(Y8UN,4#c.#tA*!#/9`a_@rQr]$<8SN:"PL@gg)\)'JLHa,5S4#D6Et4+uh[Pht=V,*,=&]:((.dI>nr^4+p5q+O3Yk7h9Y:G2L+=ug3i&N20lW^r6oL8sC5"XC;4\jQNU5YMLTGKg@a2tuS9Xp[n20=4aSFX_A"!XB7[HY1.c#^mh30CCp3TQMCtBhR&!FKj:u[n?j"s"gX=R:ghk%Zu2'Y^\5>%/qY@_=M+6BUBm-P[3o+!@Ge#b\<R7$R=Zfp"N>D>lelEQITBX!8^2^OKP`bbtEHDe?CpZ(3CN\?I^p1D<bVr4113g(Clh,^7>&Y_C-)hl:s8L[2+AAqFt<:@t6O0YV(8bOf<s!5/Be5fg^dR?$XZ?ZSs>k2L/>>`J4/7=O&.t$h9X`p`ebZF<^n)]bKn@X(pR%r'6a'r:L`J?9qdHrpm6@&QIWEOlI.Gi>G/03ACHl^hK:Ba7o0Qi_STi#t\-S21t:k7A+ePn3ablDJ9.&tjFfs[XQs8*f5L[_`i<S):CZ@<*c):UQ/W+:n>nl\Q4e5,YdX5ctEC2L$#12k^LkghgJX.^3rK]1*/\>d*;:o<l2E?=?u=d%War:'i;n'lEnT1l<ED`grh($Ygh;58Hi$7IAV;5G_aE[Zm@[H9OO0;:[(9U%-OmonC0K,.8jh011KQD:K45QjVfi*/>9V:;+pCq3#$[Kc50^ILUB00]!Jf6G$As&$FR8^oo,.NA/agdpkrG%Z]Sa::hI]g@<[]cHSo'Y\,"3f3#dLUJ,nR"h^3Vg1qSr9g_+c2p]2m)8]0\tQ['O,O9?Dadf<'Wm+m^h.)0Q28;f\%@D'>7tsEJpkIIELroskR^j_(`YF+=Bo?7\Ur#pScA9Ccsu_0bfFJ&aq0Keq@cJA.g+,h)]enPNr[sXC:l7eIugiXUUI&\Q"n6bdu4f%I)1u1VYTiK_Ubf4,,TOg\/&KF+-\HTTE~>endstream
+0.06 0.12 0.20 rg 0 744 595 98 re f
+BT /F2 20 Tf 1 1 1 rg 1 0 0 1 48 778 Tm (Build and installation) Tj ET
+BT /F2 14 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 700 Tm (Filesystem-UFS1) Tj ET
+BT /F1 11 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 673 Tm (Release 1.0.1) Tj ET
+BT /F2 13 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 620 Tm (Installed files) Tj ET
+BT /F3 8 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 591 Tm (/System/Filesystems/UFS1.so) Tj ET
+BT /F3 8 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 568 Tm (/System/Resources/Documentation/Filesystem-UFS1/UFS1.pdf) Tj ET
+BT /F3 8 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 545 Tm (/System/Kernel/Filesystems/ufs1.ko) Tj ET
+BT /F2 13 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 475 Tm (Debian package) Tj ET
+BT /F1 11 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 450 Tm (Install the prebuilt files with dpkg -i followed by the Debian filename.) Tj ET
+BT /F2 13 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 400 Tm (Manual RUN) Tj ET
+BT /F1 11 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 375 Tm (Run bash followed by the native installer filename.) Tj ET
+BT /F1 11 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 353 Tm (The installer compiles the shared object and generates this manual locally.) Tj ET
+BT /F1 11 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 331 Tm (It also compiles the Linux adapter against the running kernel headers.) Tj ET
+BT /F1 11 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 309 Tm (Use --kernel-build DIRECTORY to select another prepared kernel build.) Tj ET
+BT /F1 11 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 287 Tm (The manual installer replaces all three files.) Tj ET
+BT /F2 13 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 239 Tm (InfiltratorOS installation) Tj ET
+BT /F1 11 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 214 Tm (The OS installer builds a missing or older shared object.) Tj ET
+BT /F1 11 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 192 Tm (It verifies the manual independently and repairs it from its matching release.) Tj ET
+BT /F1 11 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 170 Tm (The kernel module is stored for manual use under its single filename.) Tj ET
+BT /F1 10 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 110 Tm (The package metadata records the source revision and SHA-256 checksums.) Tj ET
+BT /F1 9 Tf 0.07 0.14 0.24 rg 1 0 0 1 48 40 Tm (Filesystem-UFS1 | Build guide | 1.0.1) Tj ET
+endstream
 endobj
 xref
-0 9
+0 10
 0000000000 65535 f 
-0000000061 00000 n 
-0000000102 00000 n 
-0000000209 00000 n 
-0000000321 00000 n 
-0000000524 00000 n 
-0000000592 00000 n 
-0000000891 00000 n 
-0000000950 00000 n 
+0000000015 00000 n 
+0000000064 00000 n 
+0000000127 00000 n 
+0000000197 00000 n 
+0000000272 00000 n 
+0000000340 00000 n 
+0000000486 00000 n 
+0000003914 00000 n 
+0000004060 00000 n 
 trailer
-<<
-/ID 
-[<69aae95da8ddb7abe7a0d725aa471040><69aae95da8ddb7abe7a0d725aa471040>]
-% ReportLab generated PDF document -- digest (opensource)
-
-/Info 6 0 R
-/Root 5 0 R
-/Size 9
->>
+<< /Size 10 /Root 1 0 R >>
 startxref
-2465
+6278
 %%EOF
