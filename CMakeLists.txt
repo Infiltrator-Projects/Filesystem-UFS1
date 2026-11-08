@@ -3,6 +3,7 @@ project(FilesystemUFS1 VERSION 1.0.0 LANGUAGES C)
 include(CTest)
 include(FetchContent)
 find_package(OpenSSL REQUIRED)
+find_package(Python3 REQUIRED COMPONENTS Interpreter)
 set(CMAKE_C_STANDARD 11)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
@@ -12,6 +13,8 @@ FetchContent_Declare(infiltratr_common
  GIT_REPOSITORY https://github.com/Infiltrator-Projects/Libraries.git
  GIT_TAG c76ec95ef66fc728df6a906ad75a6a4dd63b419b)
 FetchContent_MakeAvailable(infiltratr_common)
+# Common is linked into the filesystem; its development files are not installed.
+set_property(DIRECTORY "${infiltratr_common_SOURCE_DIR}" PROPERTY EXCLUDE_FROM_ALL TRUE)
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/version.h" "#define LD_VERSION \"1.0.0\"\n")
 add_library(ufs1-driver SHARED
  native/ufs_native.c native/ufs_worker.c
@@ -35,6 +38,19 @@ if(BUILD_TESTING)
 endif()
 install(TARGETS ufs1-driver LIBRARY DESTINATION /System/Filesystems)
 
-# One independent runtime module and one illustrated guide. Source headers are not installed.
-install(FILES "${CMAKE_CURRENT_SOURCE_DIR}/docs/UFS1.pdf"
-        DESTINATION /System/Resources/Documentation RENAME Filesystem-UFS1.pdf)
+# Build the same current, source-derived manual used by native installer release.
+set(UFS1_GENERATED_PDF "${CMAKE_CURRENT_BINARY_DIR}/Filesystem-UFS1.pdf")
+add_custom_command(
+ OUTPUT "${UFS1_GENERATED_PDF}"
+ COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/standalone/generate_manual.py"
+         "${CMAKE_CURRENT_SOURCE_DIR}/VERSION"
+         "${CMAKE_CURRENT_SOURCE_DIR}/docs/UFS1.pages"
+         "${UFS1_GENERATED_PDF}"
+ DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION"
+         "${CMAKE_CURRENT_SOURCE_DIR}/docs/UFS1.pages"
+         "${CMAKE_CURRENT_SOURCE_DIR}/standalone/manual.py"
+         "${CMAKE_CURRENT_SOURCE_DIR}/standalone/generate_manual.py"
+ VERBATIM)
+add_custom_target(ufs1-manual ALL DEPENDS "${UFS1_GENERATED_PDF}")
+install(FILES "${UFS1_GENERATED_PDF}"
+        DESTINATION /System/Resources/Documentation)

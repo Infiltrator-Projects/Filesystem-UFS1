@@ -17,6 +17,18 @@ jobs:
           ctest --test-dir build --output-on-failure
           test -f build/UFS1.so
           nm -D build/UFS1.so | grep -F infiltrator_filesystem_ufs_v1
+      - name: Verify direct install has exactly UFS1.so and its current manual
+        shell: bash
+        run: |
+          set -euo pipefail
+          stage="$(mktemp -d)"
+          trap 'rm -rf "$stage"' EXIT
+          DESTDIR="$stage" cmake --install build
+          test "$(find "$stage" -type f | wc -l)" -eq 2
+          test -s "$stage/System/Filesystems/UFS1.so"
+          test -s "$stage/System/Resources/Documentation/Filesystem-UFS1.pdf"
+          test "$(head -c 5 "$stage/System/Resources/Documentation/Filesystem-UFS1.pdf")" = '%PDF-'
+          cmp build/Filesystem-UFS1.pdf "$stage/System/Resources/Documentation/Filesystem-UFS1.pdf"
       - uses: actions/upload-artifact@v4
         with:
           name: UFS1-so
