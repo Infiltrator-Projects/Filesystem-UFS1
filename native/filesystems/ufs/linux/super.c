@@ -833,6 +833,16 @@ static int ufs_fill_super(struct super_block *sb, void *data, int silent)
 			"default is ufstype=old\n");
 		ufs_set_opt (sbi->s_mount_opt, UFSTYPE_OLD);
 	}
+	/*
+	 * This repository owns UFS1 family formats only.  UFS2 is hosted by
+	 * the independent ufs2 driver; never interpret it through this VFS.
+	 */
+	if ((sbi->s_mount_opt & UFS_MOUNT_UFSTYPE) ==
+	    UFS_MOUNT_UFSTYPE_UFS2) {
+		if (!silent)
+			pr_err("ufs1: rejecting UFS2 mount type\n");
+		goto failed;
+	}
 
 	uspi = kzalloc(sizeof(struct ufs_sb_private_info), GFP_KERNEL);
 	sbi->s_uspi = uspi;
@@ -1060,6 +1070,12 @@ again:
 	goto failed;
 
 magic_found:
+	/* UFS2 magic cannot be interpreted as a UFS1 volume. */
+	if (uspi->fs_magic == UFS2_MAGIC) {
+		if (!silent)
+			pr_err("ufs1: rejecting UFS2 superblock magic\n");
+		goto failed;
+	}
 	/*
 	 * Check block and fragment sizes
 	 */
@@ -1468,7 +1484,7 @@ static void init_once(void *foo)
 
 static int __init init_inodecache(void)
 {
-	ufs_inode_cachep = kmem_cache_create_usercopy("ufs_inode_cache",
+	ufs_inode_cachep = kmem_cache_create_usercopy("ufs1_inode_cache",
 				sizeof(struct ufs_inode_info), 0,
 				(SLAB_RECLAIM_ACCOUNT | SLAB_ACCOUNT),
 				offsetof(struct ufs_inode_info, i_u1.i_symlink),
@@ -1510,12 +1526,12 @@ static struct dentry *ufs_mount(struct file_system_type *fs_type,
 
 static struct file_system_type ufs_fs_type = {
 	.owner		= THIS_MODULE,
-	.name		= "ufs",
+	.name		= "ufs1",
 	.mount		= ufs_mount,
 	.kill_sb	= kill_block_super,
 	.fs_flags	= FS_REQUIRES_DEV,
 };
-MODULE_ALIAS_FS("ufs");
+MODULE_ALIAS_FS("ufs1");
 
 static int __init init_ufs_fs(void)
 {
@@ -1540,5 +1556,5 @@ static void __exit exit_ufs_fs(void)
 
 module_init(init_ufs_fs)
 module_exit(exit_ufs_fs)
-MODULE_DESCRIPTION("UFS Filesystem");
+MODULE_DESCRIPTION("Independent UFS1 Filesystem");
 MODULE_LICENSE("GPL");
