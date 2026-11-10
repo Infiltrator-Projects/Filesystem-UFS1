@@ -2,6 +2,10 @@
  * UFS1 provider: sole exported contract is Common V2 CORE.
  */
 #include <infiltratr/filesystem_module_v2.h>
+/* Readable without executing untrusted ELF code; tied to the V2 export. */
+__attribute__((used,section(".ifsmeta")))
+static const char v2_module_identity[]="IFS-MODULE:ufs1:common2";
+
 #include "ufs_native.h"
 static int probe(const IfsFsHostRuntimeV2 *host,uint32_t *variant)
 {
