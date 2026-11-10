@@ -43,7 +43,8 @@ jobs:
           test -s "$RUNNER_TEMP/payload/System/Filesystems/UFS1.so"
           test -s "$RUNNER_TEMP/payload/System/Resources/Documentation/Filesystem-UFS1.pdf"
           test "$(head -c 5 "$RUNNER_TEMP/payload/System/Resources/Documentation/Filesystem-UFS1.pdf")" = '%PDF-'
-          nm -D "$RUNNER_TEMP/payload/System/Filesystems/UFS1.so" | grep -F infiltrator_filesystem_ufs_v1
+          nm -D "$RUNNER_TEMP/payload/System/Filesystems/UFS1.so" | grep -F 'infiltrator_filesystem_api_v2'
+          ! nm -D "$RUNNER_TEMP/payload/System/Filesystems/UFS1.so" | grep -E 'infiltrator_filesystem_.*_v1'
       - uses: actions/upload-artifact@v4
         with:
           name: ufs1-native-installers
