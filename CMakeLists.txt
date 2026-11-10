@@ -28,11 +28,14 @@ target_compile_options(ufs1-driver PRIVATE -Wall -Wextra -Wpedantic -Werror)
 target_link_options(ufs1-driver PRIVATE -Wl,-z,defs)
 target_include_directories(ufs1-driver PRIVATE
  "${CMAKE_CURRENT_SOURCE_DIR}/native" "${CMAKE_CURRENT_SOURCE_DIR}/compat"
- "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}")
+ "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}"
+ "${infiltratr_common_SOURCE_DIR}/include")
 target_link_libraries(ufs1-driver PRIVATE InfiltratrCommon::Common OpenSSL::Crypto)
 if(BUILD_TESTING)
  add_executable(ufs1-module-test tests/test_module.c)
- target_include_directories(ufs1-module-test PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+ target_include_directories(ufs1-module-test PRIVATE
+   "${CMAKE_CURRENT_SOURCE_DIR}/include"
+   "${infiltratr_common_SOURCE_DIR}/include")
  target_link_libraries(ufs1-module-test PRIVATE ufs1-driver)
  add_test(NAME ufs1-module-interface COMMAND ufs1-module-test)
 endif()
