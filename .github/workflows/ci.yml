@@ -18,6 +18,7 @@ jobs:
           test -f build/UFS1.so
           nm -D build/UFS1.so | grep -F 'infiltrator_filesystem_api_v2'
           ! nm -D build/UFS1.so | grep -E 'infiltrator_filesystem_.*_v1'
+          readelf -p .ifsmeta build/UFS1.so | grep -F 'IFS-MODULE:ufs1:common2'
       - name: Verify direct install has exactly UFS1.so and its current manual
         shell: bash
         run: |
