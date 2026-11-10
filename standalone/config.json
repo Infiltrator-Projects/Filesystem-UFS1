@@ -2,6 +2,6 @@
   "repository": "Filesystem-UFS1",
   "module": "UFS1.so",
   "pdf": "docs/UFS1.pdf",
-  "abi": "infiltrator_filesystem_ufs_v1",
+  "abi": "infiltrator_filesystem_api_v2",
   "build_system": "cmake"
 }
