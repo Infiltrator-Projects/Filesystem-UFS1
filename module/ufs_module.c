@@ -1,27 +1,44 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
- * UFS1 identity and read-only dispatch guard. UFS2 media is never accepted.
+ * UFS1 provider: sole exported contract is Common V2 CORE.
  */
-#include "ifs_ufs_module_v1.h"
-#include "ifs_ufs_probe_v1.h"
+#include <infiltratr/filesystem_module_v2.h>
 #include "ufs_native.h"
-int ifs_ufs_worker_main(int argc, char **argv);
-int ifs_bind_services(const IfsDefragServicesV1 *);
-void ifs_unbind_services(void);
-static int run(int argc, char **argv, const IfsDefragServicesV1 *services) {
-    if (ifs_bind_services(services) != 0) return 1;
-    const int result = ifs_ufs_worker_main(argc, argv);
-    ifs_unbind_services();
-    return result;
+static int probe(const IfsFsHostRuntimeV2 *host,uint32_t *variant)
+{
+    LdUfsSummary summary;
+    int result;
+    if(!variant)return IFS_FS_INVALID;
+    *variant=0u;
+    result=ufs_read_summary_host_v2(host,&summary);
+    if(result!=IFS_FS_OK)return result;
+    if(summary.variant!=LD_UFS_VARIANT_UFS1_LE &&
+       summary.variant!=LD_UFS_VARIANT_UFS1_BE)
+        return IFS_FS_NOT_FOUND;
+    *variant=(uint32_t)summary.variant;
+    return IFS_FS_OK;
 }
-static const IfsUfsModuleV1 api = {
-    IFS_UFS_MODULE_V1, sizeof(IfsUfsModuleV1), "ufs1",
-    IFS_UFS_CAP_RUN, run, NULL
+static const IfsFsCoreOpsV2 core={
+    .header={IFS_FS_GROUP_ABI_V2,sizeof(IfsFsCoreOpsV2),
+             IFS_FS_GROUP_CORE,0u,IFS_FS_CORE_PROBE},
+    .probe=probe
 };
-const IfsUfsModuleV1 *infiltrator_filesystem_ufs_v1(void) { return &api; }
-static int accepts_volume(const char *path) {
-    return path && ufs_probe(path) ? 0 : -1;
+static const IfsFsGroupHeaderV2 *query(
+    uint32_t group_id,uint32_t minimum,uint32_t maximum)
+{
+    return group_id==IFS_FS_GROUP_CORE &&
+           minimum<=IFS_FS_GROUP_ABI_V2 &&
+           maximum>=IFS_FS_GROUP_ABI_V2 ? &core.header : NULL;
 }
-static const IfsUfsProbeV1 probe = {
-    IFS_UFS_PROBE_ABI_V1, sizeof(IfsUfsProbeV1), "ufs1", accepts_volume
+static const IfsFsModuleApiV2 api={
+    .abi_version=IFS_FS_COMMON_ABI_V2,
+    .structure_bytes=sizeof(IfsFsModuleApiV2),
+    .format_id="ufs1",
+    .runtime_profiles=IFS_FS_PROFILE_HOSTED,
+    .group_mask=IFS_FS_GROUP_BIT(IFS_FS_GROUP_CORE),
+    .query_group=query
 };
-const IfsUfsProbeV1 *infiltrator_filesystem_ufs_probe_v1(void) { return &probe; }
+__attribute__((visibility("default")))
+const IfsFsModuleApiV2 *infiltrator_filesystem_api_v2(void)
+{
+    return &api;
+}
