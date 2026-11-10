@@ -35,6 +35,7 @@ if(BUILD_TESTING)
  add_executable(ufs1-module-test tests/test_module.c)
  target_include_directories(ufs1-module-test PRIVATE
    "${CMAKE_CURRENT_SOURCE_DIR}/include"
+   "${CMAKE_CURRENT_SOURCE_DIR}/native"
    "${infiltratr_common_SOURCE_DIR}/include")
  target_link_libraries(ufs1-module-test PRIVATE ufs1-driver)
  add_test(NAME ufs1-module-interface COMMAND ufs1-module-test)
