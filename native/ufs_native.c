@@ -870,6 +870,7 @@ int ufs_verify_free_bitmap_host_v2(const IfsFsHostRuntimeV2 *host,
     if (!summary->allocation_totals_known || !summary->cylinder_geometry_known)
         return IFS_FS_UNSUPPORTED;
     if (!summary->fragment_size || !summary->fragments_per_group ||
+        !summary->fragments_per_block ||
         summary->cylinder_group_size < UFS_CG_MIN_BYTES ||
         !summary->cylinder_groups ||
         summary->filesystem_fragments > UINT64_MAX / summary->fragment_size ||
