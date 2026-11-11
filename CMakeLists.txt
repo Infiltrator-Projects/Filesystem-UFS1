@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 3.20)
-project(FilesystemUFS1 VERSION 1.0.0 LANGUAGES C)
+file(STRINGS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION" UFS1_RELEASE_VERSION LIMIT_COUNT 1)
+project(FilesystemUFS1 VERSION ${UFS1_RELEASE_VERSION} LANGUAGES C)
 include(CTest)
 include(FetchContent)
 find_package(OpenSSL REQUIRED)
@@ -15,7 +16,7 @@ FetchContent_Declare(infiltratr_common
 FetchContent_MakeAvailable(infiltratr_common)
 # Common is linked into the filesystem; its development files are not installed.
 set_property(DIRECTORY "${infiltratr_common_SOURCE_DIR}" PROPERTY EXCLUDE_FROM_ALL TRUE)
-file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/version.h" "#define LD_VERSION \"1.0.0\"\n")
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/version.h" "#define LD_VERSION \"${PROJECT_VERSION}\"\n")
 add_library(ufs1-driver SHARED
  native/ufs_native.c native/ufs_worker.c
  compat/legacy_services.c compat/runtime_alloc.c

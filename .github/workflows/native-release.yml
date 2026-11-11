@@ -128,9 +128,21 @@ jobs:
           tag="v$(tr -d '\r\n' < VERSION)"
           test "$(find dist -maxdepth 1 -type f | wc -l)" -eq 3
           if gh release view "$tag" >/dev/null 2>&1; then
-            echo "Existing immutable release retained"
+            existing=$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.sha')
+            if [ "$existing" != "$GITHUB_SHA" ]; then
+              echo "::error::Immutable $tag points to $existing, not $GITHUB_SHA. Advance VERSION before publishing new code." >&2
+              exit 1
+            fi
+            echo "Existing exact-source immutable release retained: $tag at $existing"
             exit 0
           fi
           gh release create "$tag" dist/*.deb dist/*.run dist/*.ko --target "$GITHUB_SHA" \
             --title "UFS1 experimental module $tag" \
             --notes "Independent UFS1.so, generated PDF, qualified ufs1.ko and source-embedded native RUN. Built with the exact embedded Libraries/Common source. Real-media mutation, defrag and recovery qualification is pending; not certified production-safe."
+          # A green publish job must mean the immutable tag and downloaded
+          # release assets agree with this exact qualified source revision.
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" --jq '.object.sha')" = "$GITHUB_SHA"
+          remote="$(mktemp -d)"
+          trap 'rm -rf -- "$remote"' EXIT
+          gh release download "$tag" --dir "$remote"
+          diff -qr dist "$remote"
