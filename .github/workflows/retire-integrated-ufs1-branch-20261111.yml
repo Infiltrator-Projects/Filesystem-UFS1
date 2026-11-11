@@ -1,0 +1,40 @@
+name: Retire exact integrated UFS1 development branch
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/retire-integrated-ufs1-branch-20261111.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  retire:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Archive integrated commit then remove exact stale branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          expected='3d592ef40552b5b575161892a769a6020172699e'
+          branch='hal/strict-v2-ufs1-20261110'
+          tag='archive/2026-11-11/ufs1-integrated-v2-3d592ef40552'
+          git fetch -q origin main
+          git merge-base --is-ancestor "$expected" origin/main || { echo 'UFS1 V2 commit is not on main; refusing branch retirement' >&2; exit 1; }
+          actual=$(gh api "repos/$GH_REPO/git/ref/heads/$branch" --jq '.object.sha')
+          test "$actual" = "$expected" || { echo 'UFS1 branch changed; refusing retirement' >&2; exit 1; }
+          if existing=$(gh api "repos/$GH_REPO/git/ref/tags/$tag" --jq '.object.sha' 2>/dev/null); then
+            test "$existing" = "$expected" || { echo 'Archive tag collision' >&2; exit 1; }
+          else
+            gh api -X POST "repos/$GH_REPO/git/refs" -f ref="refs/tags/$tag" -f sha="$expected" >/dev/null
+          fi
+          test "$(gh api "repos/$GH_REPO/git/ref/tags/$tag" --jq '.object.sha')" = "$expected"
+          test "$(gh api "repos/$GH_REPO/git/ref/heads/$branch" --jq '.object.sha')" = "$expected"
+          gh api -X DELETE "repos/$GH_REPO/git/refs/heads/$branch"
+          if gh api "repos/$GH_REPO/git/ref/heads/$branch" >/dev/null 2>&1; then echo 'Branch still exists' >&2; exit 1; fi
+          echo "UFS1: archived $expected and removed $branch, preserving main"
