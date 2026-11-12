@@ -42,6 +42,11 @@ static void *host_allocate(void *context,size_t bytes)
 static void host_release(void *context,void *ptr)
 { (void)context;free(ptr); }
 
+static void put16(unsigned char *p,size_t at,uint16_t v,int little)
+{
+    for(unsigned i=0u;i<2u;++i)
+        p[at+i]=(unsigned char)(v>>(8u*(little?i:1u-i)));
+}
 static void put32(unsigned char *p,size_t at,uint32_t v,int little)
 {
     for (unsigned i=0u;i<4u;++i)
@@ -87,6 +92,48 @@ static int write_geometry(int fd,const unsigned char magic[4],int little,
         cg[176u+(bit>>3u)] |= (unsigned char)(1u << (bit & 7u));
     if(pwrite(fd,cg,sizeof cg,1024)!=(ssize_t)sizeof cg) return -1;
     return pwrite(fd,sb,sizeof sb,8192)==(ssize_t)sizeof sb ? 0:-1;
+}
+/* Genuine, bounded on-disk UFS1 inode/dirent fixture. Only the test
+ * harness writes this disposable image: the provider receives a read-only
+ * V2 host. Real inode pointers and free bitmap must agree before MAP. */
+static int write_file_fixture(int fd,int little)
+{
+    unsigned char cg[512]={0},root[128]={0},file[128]={0};
+    unsigned char directory[512]={0},payload[1024]={0};
+    put32(cg,4u,0x00090255u,little);
+    put32(cg,12u,0u,little);
+    put32(cg,20u,64u,little);
+    put32(cg,92u,168u,little);
+    put32(cg,96u,176u,little);
+    cg[168u] = (unsigned char)((1u<<2u)|(1u<<3u));
+    for(unsigned bit=22u;bit<64u;++bit)
+        cg[176u+(bit>>3u)] |= (unsigned char)(1u<<(bit&7u));
+    put16(root,0u,UINT16_C(0040755),little);
+    put64(root,8u,512u,little);
+    put32(root,40u,16u,little);
+    put16(file,0u,UINT16_C(0100644),little);
+    put64(file,8u,1024u,little);
+    put32(file,40u,18u,little);
+
+    put32(directory,0u,2u,little);
+    put16(directory,4u,12u,little);
+    directory[6u]=4u;directory[7u]=1u;
+    memcpy(directory+8u,".",1u);
+    put32(directory,12u,2u,little);
+    put16(directory,16u,12u,little);
+    directory[18u]=4u;directory[19u]=2u;
+    memcpy(directory+20u,"..",2u);
+    put32(directory,24u,3u,little);
+    put16(directory,28u,488u,little);
+    directory[30u]=8u;directory[31u]=11u;
+    memcpy(directory+32u,"example.txt",11u);
+    memcpy(payload,"UFS1 native Common V2 inode data",32u);
+    return pwrite(fd,cg,sizeof(cg),1024)==(ssize_t)sizeof(cg) &&
+           pwrite(fd,root,sizeof(root),2048+2*128)==(ssize_t)sizeof(root) &&
+           pwrite(fd,file,sizeof(file),2048+3*128)==(ssize_t)sizeof(file) &&
+           pwrite(fd,directory,sizeof(directory),16*1024)==(ssize_t)sizeof(directory) &&
+           pwrite(fd,payload,sizeof(payload),18*1024)==(ssize_t)sizeof(payload)
+           ? 0:-1;
 }
 int main(void)
 {
@@ -164,6 +211,39 @@ int main(void)
     CHECK(core->unmount(previous)==IFS_FS_INVALID);
     info.structure_bytes=sizeof(info);
     CHECK(ops->query(previous,&info)==IFS_FS_INVALID);
+    CHECK(write_file_fixture(fd,1)==0);
+    info.structure_bytes=sizeof(info);
+    CHECK(core->mount(&host,&session,&info)==IFS_FS_OK);
+    count=0u;
+    CHECK(defrag->map(session,"/",0u,&extent,1u,&count)==IFS_FS_OK);
+    CHECK(count==1u && extent.logical_offset==0u &&
+          extent.physical_offset==16u*1024u && extent.length==512u);
+    count=0u;
+    CHECK(defrag->map(session,"/example.txt",0u,&extent,1u,&count)==IFS_FS_OK);
+    CHECK(count==1u && extent.logical_offset==0u &&
+          extent.physical_offset==18u*1024u && extent.length==1024u);
+    count=42u;
+    CHECK(defrag->map(session,"/example.txt",1u,&extent,1u,&count)==IFS_FS_END);
+    CHECK(count==0u);
+    count=42u;
+    CHECK(defrag->map(session,"/missing",0u,&extent,1u,&count)==IFS_FS_NOT_FOUND);
+    CHECK(count==0u);
+    count=42u;
+    CHECK(defrag->map(session,"/../example.txt",0u,&extent,1u,&count)==IFS_FS_INVALID);
+    CHECK(count==0u);
+    CHECK(core->unmount(session)==IFS_FS_OK);
+
+    /* An inode pointing to a CG bitmap FREE fragment is corrupt, never
+     * mapped as a physical extent or mistaken for unallocated file data. */
+    unsigned char bad_pointer[4]={0};
+    put32(bad_pointer,0u,22u,1);
+    CHECK(pwrite(fd,bad_pointer,4u,2048+3*128+40)==4);
+    info.structure_bytes=sizeof(info);
+    CHECK(core->mount(&host,&session,&info)==IFS_FS_OK);
+    count=0u;
+    CHECK(defrag->map(session,"/example.txt",0u,&extent,1u,&count)==IFS_FS_CORRUPT);
+    CHECK(count==0u);
+    CHECK(core->unmount(session)==IFS_FS_OK);
     /* A valid superblock with a corrupted cylinder-group free map must be
      * rejected rather than exposing unverified recorded free totals. */
     unsigned char damaged=0u;
