@@ -22,7 +22,7 @@ The independent UFS1 module now exposes read-only DEFRAG.MAP using its
 existing validated native cylinder-group, inode and indirect-block scanner
 through authenticated partition-relative Common V2 host I/O. The provider
 resolves absolute directory paths itself and returns actual paginated file
-extents. Sparse logical offsets are preserved as gaps. No retired V1 service
+extents. Sparse logical offsets are preserved as gaps. No retired service
 binding is required for the V2 mapper. The pre-existing native transaction
 writer and recovery remain unchanged and are not advertised as V2 PLAN,
 EXECUTE, VERIFY or RECOVER. Synthetic API tests are not equivalent to
