@@ -123,10 +123,17 @@ static int write_file_fixture(int fd,int little)
     put16(directory,16u,12u,little);
     directory[18u]=4u;directory[19u]=2u;
     memcpy(directory+20u,"..",2u);
+    /* BSD dirent permits a 4-byte name in a 12-byte record, without
+     * an extra NUL byte inside the record. The former >= comparison
+     * incorrectly rejected this valid native UFS1 entry. */
     put32(directory,24u,3u,little);
-    put16(directory,28u,488u,little);
-    directory[30u]=8u;directory[31u]=11u;
-    memcpy(directory+32u,"example.txt",11u);
+    put16(directory,28u,12u,little);
+    directory[30u]=8u;directory[31u]=4u;
+    memcpy(directory+32u,"test",4u);
+    put32(directory,36u,3u,little);
+    put16(directory,40u,476u,little);
+    directory[42u]=8u;directory[43u]=11u;
+    memcpy(directory+44u,"example.txt",11u);
     memcpy(payload,"UFS1 native Common V2 inode data",32u);
     return pwrite(fd,cg,sizeof(cg),1024)==(ssize_t)sizeof(cg) &&
            pwrite(fd,root,sizeof(root),2048+2*128)==(ssize_t)sizeof(root) &&
@@ -218,6 +225,10 @@ int main(void)
     CHECK(defrag->map(session,"/",0u,&extent,1u,&count)==IFS_FS_OK);
     CHECK(count==1u && extent.logical_offset==0u &&
           extent.physical_offset==16u*1024u && extent.length==512u);
+    count=0u;
+    CHECK(defrag->map(session,"/test",0u,&extent,1u,&count)==IFS_FS_OK);
+    CHECK(count==1u && extent.logical_offset==0u &&
+          extent.physical_offset==18u*1024u && extent.length==1024u);
     count=0u;
     CHECK(defrag->map(session,"/example.txt",0u,&extent,1u,&count)==IFS_FS_OK);
     CHECK(count==1u && extent.logical_offset==0u &&

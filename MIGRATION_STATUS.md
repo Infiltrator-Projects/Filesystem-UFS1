@@ -27,3 +27,11 @@ binding is required for the V2 mapper. The pre-existing native transaction
 writer and recovery remain unchanged and are not advertised as V2 PLAN,
 EXECUTE, VERIFY or RECOVER. Synthetic API tests are not equivalent to
 real-world UFS1 fixture or physical-media qualification.
+
+## Common V2 native BSD dirent exact-length coverage (1.0.11)
+The filesystem-owned directory scanner now accepts a valid record whose
+byte length equals the eight-byte header plus the filename byte count.
+A native C synthetic-on-disk inode/dirent test covers a four-byte name in
+an exact 12-byte dirent while retaining the earlier multi-record, missing
+file, and corrupted free-bitmap-owned data pointer checks. Source-owned
+DEFRAG.MAP remains read-only; V2 writer/recovery remains unqualified.
