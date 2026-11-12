@@ -16,3 +16,14 @@ space. Totals that disagree, damaged group headers or inconsistent bitmap
 geometry fail closed. The native UFS1 scanner remains solely in this repo.
 These totals do not replace file/directory traversal, full fsck, the native
 DEFRAG extent map, transaction recovery or real-media power-failure testing.
+
+## Common V2 native file extent mapping (1.0.10)
+The independent UFS1 module now exposes read-only DEFRAG.MAP using its
+existing validated native cylinder-group, inode and indirect-block scanner
+through authenticated partition-relative Common V2 host I/O. The provider
+resolves absolute directory paths itself and returns actual paginated file
+extents. Sparse logical offsets are preserved as gaps. No retired V1 service
+binding is required for the V2 mapper. The pre-existing native transaction
+writer and recovery remain unchanged and are not advertised as V2 PLAN,
+EXECUTE, VERIFY or RECOVER. Synthetic API tests are not equivalent to
+real-world UFS1 fixture or physical-media qualification.
