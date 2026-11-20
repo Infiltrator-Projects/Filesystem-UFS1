@@ -205,8 +205,12 @@ int main(void)
     CHECK(info.variant==variant && info.block_bytes==4096u);
     CHECK(info.total_bytes==65536u && info.free_bytes==43008u);
     CHECK(info.max_name_bytes==255u);
-    CHECK(core->mount(&host,&previous,&info)==IFS_FS_BUSY);
-    CHECK(previous==NULL);
+    CHECK(core->mount(&host,&previous,&info)==IFS_FS_OK);
+    CHECK(previous!=NULL && previous!=session);
+    info.structure_bytes=sizeof(info);
+    CHECK(ops->query(previous,&info)==IFS_FS_OK);
+    CHECK(core->unmount(previous)==IFS_FS_OK);
+    CHECK(ops->query(previous,&info)==IFS_FS_INVALID);
     info.structure_bytes=sizeof(info);
     CHECK(ops->query(session,&info)==IFS_FS_OK);
     IfsFsExtentV2 extent={0};
@@ -221,8 +225,14 @@ int main(void)
     info.structure_bytes=sizeof(info);
     CHECK(ops->query(previous,&info)==IFS_FS_INVALID);
     CHECK(write_file_fixture(fd,1)==0);
+    unsigned char before_reads[65536],after_reads[65536];
+    CHECK(pread(fd,before_reads,sizeof(before_reads),0)==
+          (ssize_t)sizeof(before_reads));
     info.structure_bytes=sizeof(info);
     CHECK(core->mount(&host,&session,&info)==IFS_FS_OK);
+    void *parallel=NULL;
+    CHECK(core->mount(&host,&parallel,&info)==IFS_FS_OK &&
+          parallel!=NULL && parallel!=session);
     {
         char name[256]={0},data[64]={0};
         IfsFsEntryV2 entry={.structure_bytes=sizeof(entry),.name=name,
@@ -265,6 +275,19 @@ int main(void)
     CHECK(defrag->map(session,"/../example.txt",0u,&extent,1u,&count)==IFS_FS_INVALID);
     CHECK(count==0u);
     CHECK(core->unmount(session)==IFS_FS_OK);
+    CHECK(ops->query(session,&info)==IFS_FS_INVALID);
+    info.structure_bytes=sizeof(info);
+    CHECK(ops->query(parallel,&info)==IFS_FS_OK);
+    {
+        char data[32]={0};
+        CHECK(core->read(parallel,"/test",0u,data,32u)==IFS_FS_OK);
+        CHECK(memcmp(data,"UFS1 native Common V2 inode data",32u)==0);
+    }
+    CHECK(core->unmount(parallel)==IFS_FS_OK);
+    CHECK(ops->query(parallel,&info)==IFS_FS_INVALID);
+    CHECK(pread(fd,after_reads,sizeof(after_reads),0)==
+          (ssize_t)sizeof(after_reads));
+    CHECK(memcmp(before_reads,after_reads,sizeof(before_reads))==0);
 
     /* An inode pointing to a CG bitmap FREE fragment is corrupt, never
      * mapped as a physical extent or mistaken for unallocated file data. */
