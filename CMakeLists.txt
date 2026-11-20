@@ -53,6 +53,18 @@ add_custom_command(OUTPUT "${UFS1_FIRMWARE_ELF}"
   "${infiltratr_common_SOURCE_DIR}/include/infiltratr/filesystem_module_v2.h"
  VERBATIM)
 add_custom_target(ufs1-firmware-elf DEPENDS "${UFS1_FIRMWARE_ELF}")
+# Stage the same freestanding engine in the installed V2 shared-object carrier.
+if(NOT CMAKE_OBJCOPY)
+ find_program(CMAKE_OBJCOPY NAMES objcopy llvm-objcopy REQUIRED)
+endif()
+add_dependencies(ufs1-driver ufs1-firmware-elf)
+set_property(TARGET ufs1-driver APPEND PROPERTY LINK_DEPENDS "${UFS1_FIRMWARE_ELF}")
+add_custom_command(TARGET ufs1-driver POST_BUILD
+ COMMAND "${CMAKE_OBJCOPY}" --add-section
+  ".infiltrator_boot=${UFS1_FIRMWARE_ELF}"
+  --set-section-flags .infiltrator_boot=readonly
+  "$<TARGET_FILE:ufs1-driver>"
+ VERBATIM)
 
 if(BUILD_TESTING)
  add_executable(ufs1-module-test tests/test_module.c)
