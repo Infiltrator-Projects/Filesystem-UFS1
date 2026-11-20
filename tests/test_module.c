@@ -160,10 +160,12 @@ int main(void)
     CHECK(defrag->header.capabilities==IFS_FS_DEFRAG_MAP);
     CHECK(defrag->map && !defrag->plan && !defrag->execute &&
           !defrag->verify && !defrag->recover && !defrag->release_plan);
-    CHECK(core->header.capabilities==(IFS_FS_CORE_PROBE|IFS_FS_CORE_MOUNT));
+    CHECK(core->header.capabilities==(IFS_FS_CORE_PROBE|IFS_FS_CORE_MOUNT|
+           IFS_FS_CORE_STAT|IFS_FS_CORE_LIST|IFS_FS_CORE_READ));
     CHECK(ops->header.capabilities==IFS_FS_VOLUME_QUERY);
     CHECK(core->probe && core->mount && core->unmount && ops->query);
-    CHECK(!core->read && !core->write && !core->create && !core->remove);
+    CHECK(core->stat && core->directory_entry && core->read &&
+          !core->write && !core->create && !core->remove);
     CHECK(!ops->format && !ops->repair && !ops->sync);
     char path[]="/tmp/ufs1-v2-geometry-XXXXXX";
     int fd=mkstemp(path);
@@ -221,6 +223,26 @@ int main(void)
     CHECK(write_file_fixture(fd,1)==0);
     info.structure_bytes=sizeof(info);
     CHECK(core->mount(&host,&session,&info)==IFS_FS_OK);
+    {
+        char name[256]={0},data[64]={0};
+        IfsFsEntryV2 entry={.structure_bytes=sizeof(entry),.name=name,
+                            .name_capacity=sizeof(name)};
+        CHECK(core->stat(session,"/example.txt",&entry)==IFS_FS_OK);
+        CHECK(entry.type==IFS_FS_ENTRY_FILE &&
+              entry.size_bytes==1024u &&
+              strcmp(name,"example.txt")==0);
+        CHECK(core->directory_entry(session,"/",0u,&entry)==IFS_FS_OK &&
+              strcmp(name,"test")==0);
+        CHECK(core->directory_entry(session,"/",1u,&entry)==IFS_FS_OK &&
+              strcmp(name,"example.txt")==0);
+        CHECK(core->directory_entry(session,"/",2u,&entry)==IFS_FS_END);
+        CHECK(core->read(session,"/test",0u,data,32u)==IFS_FS_OK);
+        CHECK(memcmp(data,"UFS1 native Common V2 inode data",32u)==0);
+        CHECK(core->read(session,"/test",1024u,data,1u)==IFS_FS_INVALID);
+        CHECK(core->stat(session,"/missing",&entry)==IFS_FS_NOT_FOUND);
+        CHECK(core->read(session,"/../test",0u,data,4u)==IFS_FS_INVALID);
+        CHECK(core->read(session,"/",0u,data,4u)==IFS_FS_INVALID);
+    }
     count=0u;
     CHECK(defrag->map(session,"/",0u,&extent,1u,&count)==IFS_FS_OK);
     CHECK(count==1u && extent.logical_offset==0u &&
