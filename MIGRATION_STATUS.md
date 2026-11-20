@@ -1,23 +1,24 @@
-# UFS1 Common V2 migration status
+# UFS1 Common V2 and BOOT qualification
 
-The native `native/ufs_native.c` implementation supplies all Common V2
-on-media geometry and allocation validation, checked native BSD inode and
-directory traversal, and actual file reads. It uses an authenticated,
-partition-relative Common V2 host for every production read. Real disposable
-UFS1 images test root/file stat, multi-entry directory enumeration,
-contents from inode extents, missing paths, invalid traversal, corrupted
-bitmaps and read-only nonmutation.
+The source-owned native UFS1 filesystem engine supplies read-only Common V2
+PROBE/MOUNT/UNMOUNT, STAT/LIST/READ and DEFRAG.MAP using authenticated
+partition-relative bounded host I/O, genuine BSD inode/dirent records,
+the UFS1 allocation map and indirect file block traversal. Independent
+mounted volumes use non-recycled opaque tokens and distinct inventories.
 
-The production UFS1.so exports only Common V2, without Linux VFS,
-historical worker or V1 Defragmenter service imports. The independent native
-writer and Linux kernel adapter remain in repository source only. The old
-.ko release path is disabled. Portable DEB and source-embedded RUN carry
-exactly UFS1.so plus its PDF. **Concurrent read-only mounts now use independent session slots and
-non-recycled opaque tokens, so unmounting one volume cannot invalidate its
-peers.** Disposable Common V2 regression tests cover concurrent readers,
-stale handles and byte-for-byte media nonmutation.
+The hosted and freestanding profiles compile the same native/ufs_native.c
+and module/ufs_module.c. The installed UFS1.so includes a no-import
+freestanding ELF embedded in .infiltrator_boot; production exports Common
+V2 only. Historical V1, Linux kernel and worker sources remain in the
+repository but are not shipped as runtime substitutes.
 
-**Not yet BOOT qualified:** same engine needs a freestanding EFI-compatible
-build, embedded ELF, no libc dependence in firmware, actual unmodified BOOT
-validator acceptance and OVMF real kernel/initramfs read/nonmutation tests.
-No new official release is permitted until those checks pass.
+The unmodified production BOOT 0.1.77 validator qualifies both standalone
+firmware and installed SO. Disposable OVMF reads an EFI-stub kernel and
+initramfs from a real UFS1 test volume via the Common V2 module staged in
+EFI/BOOT/drivers_x64, refuses corrupt-superblock media and verifies no
+source-volume mutation. Portable Debian and CPU-native source RUN module
+binaries must also pass the same validator. Immutable release publication
+is gated on exact-commit hosted and OVMF success.
+
+Physical Secure Boot signature/MOK integration remains a separate
+environment-specific qualification; CI does not alter live NVRAM or ESP.

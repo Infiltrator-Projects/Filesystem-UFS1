@@ -2,7 +2,7 @@
 # Hosted V2 real file namespace qualified independently. Do not release a
 # BOOT provider until freestanding ELF, the production validator and OVMF
 # kernel/initramfs non-mutation tests pass. Never bundle Linux .ko as fallback.
-name: Qualify UFS1 Common V2 hosted DEB and native RUN
+name: Qualify and release UFS1 BOOT-ready Common V2 DEB and native RUN
 on:
   push:
     branches: [main]
@@ -42,8 +42,96 @@ jobs:
           test "$(find "$RUNNER_TEMP/native-root" -type f | wc -l)" = 2
           bash tests/check_v2_exports.sh "$RUNNER_TEMP/native-root/System/Filesystems/UFS1.so"
           test "$(find "$RUNNER_TEMP/native-root" -name '*.ko' | wc -l)" = 0
+      - name: Validate packaged portable and native Common V2 SO against BOOT
+        run: |
+          set -euo pipefail
+          boot=infiltrator-boot_0.1.77_amd64.deb
+          curl -fsSL --retry 3 \
+            "https://github.com/Infiltrator-Projects/Boot/releases/download/v0.1.77/$boot" \
+            -o "$RUNNER_TEMP/$boot"
+          printf '%s  %s\n' \
+            4b2fa8eaa116b7e719329c5bbaa39ee3a093fbe1c1eac0c57440d0f82217d8a5 \
+            "$RUNNER_TEMP/$boot" | sha256sum -c -
+          dpkg-deb -x "$RUNNER_TEMP/$boot" "$RUNNER_TEMP/boot"
+          validator="$RUNNER_TEMP/boot/usr/lib/infiltrator-boot/validate-module"
+          for module in \
+            "$RUNNER_TEMP/portable/System/Filesystems/UFS1.so" \
+            "$RUNNER_TEMP/native-root/System/Filesystems/UFS1.so"; do
+            test -s "$module"
+            readelf -SW "$module" | grep -F .infiltrator_boot
+            "$validator" "$module"
+            ! nm -D --defined-only "$module" | grep -E 'infiltrator_filesystem_.*_v1'
+          done
+          echo UFS1_PORTABLE_AND_NATIVE_RUN_VALIDATOR_PASS
       - uses: actions/upload-artifact@v4
         with:
-          name: UFS1-hosted-v2-not-BOOT-qualified
+          name: ufs1-boot-qualified-release
           path: dist/*
           if-no-files-found: error
+
+  publish:
+    needs: qualify
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    permissions:
+      contents: write
+      actions: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/download-artifact@v4
+        with:
+          name: ufs1-boot-qualified-release
+          path: dist
+      - name: Require exact-head UFS1 native and real BOOT OVMF success
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          endpoint="repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&per_page=100"
+          for attempt in $(seq 1 150); do
+            runs=$(gh api "$endpoint" --jq '.workflow_runs[] | .name + ":" + (.conclusion // .status)')
+            if printf '%s\n' "$runs" | grep -Fxq 'Qualify UFS1 native freestanding Common V2 ELF:failure' ||
+               printf '%s\n' "$runs" | grep -Fxq 'UFS1 independent shared object:failure'; then
+              echo "UFS1 OVMF or hosted test failed on this commit" >&2
+              exit 1
+            fi
+            if printf '%s\n' "$runs" | grep -Fxq 'Qualify UFS1 native freestanding Common V2 ELF:success' &&
+               printf '%s\n' "$runs" | grep -Fxq 'UFS1 independent shared object:success'; then
+              echo "UFS1_EXACT_HEAD_UEFI_AND_NATIVE_PASS $GITHUB_SHA"
+              exit 0
+            fi
+            sleep 10
+          done
+          echo "Exact-head firmware/hosted verification absent" >&2
+          exit 1
+      - name: Publish and verify immutable BOOT-ready UFS1 DEB and RUN
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=$(tr -d '\r\n' < VERSION)
+          tag="v$version"
+          test "$(find dist -maxdepth 1 -name '*.deb' | wc -l)" -eq 1
+          test "$(find dist -maxdepth 1 -name '*.run' | wc -l)" -eq 1
+          ! find dist -name '*.ko' | grep .
+          (cd dist && sha256sum -- *.deb *.run) > "$RUNNER_TEMP/hashes.txt"
+          if gh release view "$tag" --json tagName >/dev/null 2>&1; then
+            target=$(gh release view "$tag" --json targetCommitish --jq .targetCommitish)
+            if [[ "$target" != "$GITHUB_SHA" ]]; then
+              echo "Immutable $tag belongs to $target; new VERSION required"
+              exit 0
+            fi
+          elif gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$tag" >/dev/null 2>&1; then
+            echo "Tag $tag exists without a verified release" >&2
+            exit 1
+          else
+            gh release create "$tag" dist/*.deb dist/*.run \
+              --target "$GITHUB_SHA" \
+              --title "UFS1 Common V2 firmware reader $version" \
+              --notes "One UFS1.so with source-owned hosted and embedded freestanding V2 reader. BOOT 0.1.77 validates portable and native source RUN shared objects; OVMF boots an EFI-stub kernel and initramfs from a real UFS1 inode/indirect-block disk image and rejects corrupted metadata without media modification. No V1 or Linux kernel module fallback."
+          fi
+          mkdir -p "$RUNNER_TEMP/immutable"
+          gh release download "$tag" -p '*.deb' -p '*.run' --dir "$RUNNER_TEMP/immutable"
+          (cd "$RUNNER_TEMP/immutable" && sha256sum -c "$RUNNER_TEMP/hashes.txt")
+          echo "UFS1_IMMUTABLE_RELEASE_PASS $tag $GITHUB_SHA"
