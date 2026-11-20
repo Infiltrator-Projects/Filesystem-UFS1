@@ -103,8 +103,13 @@ static const UfsMagic UFS_MAGICS[] = {
 
 static void ufs_error(char *error, size_t error_size, const char *message)
 {
-    if (error != NULL && error_size != 0U)
-        (void)snprintf(error, error_size, "%s", message);
+    if (!error || !error_size || !message) return;
+    size_t i = 0u;
+    while (i + 1u < error_size && message[i]) {
+        error[i] = message[i];
+        ++i;
+    }
+    error[i] = '\0';
 }
 
 static bool ufs_little_endian(LdUfsVariant variant)
@@ -1000,7 +1005,9 @@ static int inventory_block_push(UfsInventory *inventory, UfsBlockRef block,
 static void inventory_free(UfsInventory *inventory)
 {
     if (inventory == NULL) return;
+#ifndef IFS_UFS_FIRMWARE_BUILD
     if (inventory->fd >= 0) (void)close(inventory->fd);
+#endif
     free(inventory->files);
     free(inventory->blocks);
     free(inventory->free_bitmap);

@@ -35,6 +35,25 @@ target_include_directories(ufs1-driver PRIVATE
  "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}"
  "${infiltratr_common_SOURCE_DIR}/include")
 target_link_libraries(ufs1-driver PRIVATE InfiltratrCommon::Common OpenSSL::Crypto)
+# A standalone, non-installed Common V2 firmware ELF made from the same
+# native UFS1 decoder and V2 callbacks. Publication requires real OVMF reads.
+set(UFS1_FIRMWARE_DIR "${CMAKE_CURRENT_BINARY_DIR}/firmware")
+set(UFS1_FIRMWARE_ELF "${UFS1_FIRMWARE_DIR}/UFS1.so")
+add_custom_command(OUTPUT "${UFS1_FIRMWARE_ELF}"
+ COMMAND "${CMAKE_COMMAND}" -S "${CMAKE_CURRENT_SOURCE_DIR}/module/firmware"
+  -B "${UFS1_FIRMWARE_DIR}" -DCMAKE_BUILD_TYPE=Release
+  "-DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}"
+  "-DCOMMON_INCLUDE_DIR=${infiltratr_common_SOURCE_DIR}/include"
+  "-DCOMMON_SOURCE_DIR=${infiltratr_common_SOURCE_DIR}"
+ COMMAND "${CMAKE_COMMAND}" --build "${UFS1_FIRMWARE_DIR}" --parallel 2
+ DEPENDS module/firmware/CMakeLists.txt module/firmware/runtime.c
+  native/ufs_native.c module/ufs_module.c
+  "${infiltratr_common_SOURCE_DIR}/src/arithmetic.c"
+  "${infiltratr_common_SOURCE_DIR}/src/core.c"
+  "${infiltratr_common_SOURCE_DIR}/include/infiltratr/filesystem_module_v2.h"
+ VERBATIM)
+add_custom_target(ufs1-firmware-elf DEPENDS "${UFS1_FIRMWARE_ELF}")
+
 if(BUILD_TESTING)
  add_executable(ufs1-module-test tests/test_module.c)
  target_include_directories(ufs1-module-test PRIVATE
