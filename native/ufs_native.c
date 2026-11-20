@@ -1026,8 +1026,15 @@ static int inventory_read_exact_at(const UfsInventory *inventory,
         }
         return 0;
     }
+#if defined(IFS_UFS_V2_PRODUCTION)
+    /* The production .so must never silently use a pathname/fd reader
+     * when invoked without a validated Common V2 host. */
+    ufs_error(error, error_size, "Common V2 host is required");
+    return -1;
+#else
     return read_exact_at(inventory->fd, buffer, bytes, offset,
                          error, error_size, description);
+#endif
 }
 
 static int read_group(const UfsInventory *inventory, uint32_t group,
@@ -1095,20 +1102,14 @@ static int inventory_load_free_bitmap(UfsInventory *inventory,
      * Defragmenter services binding. Use a checked native bitmap size for
      * V2, while preserving the established services path for V1 writers. */
     const uint64_t fragments=inventory->summary.filesystem_fragments;
-    if (inventory->host) {
-        const uint64_t needed=(fragments / 8u) +
-                              (uint64_t)(fragments % 8u != 0u);
-        if(needed > SIZE_MAX) {
-            ufs_error(error,error_size,"UFS hosted bitmap size overflows");
-            return -1;
-        }
-        inventory->bitmap_bytes=(size_t)needed;
-    } else if (!ld_bitmap_size(inventory->summary.filesystem_fragments,
-                               &inventory->bitmap_bytes)) {
-
-        ufs_error(error, error_size, "UFS allocation bitmap is too large");
+    /* Identical checked native geometry for hosted V2 and historical tests.
+     * Retire the old Defragmenter service requirement for bitmap sizing. */
+    const uint64_t needed=(fragments/8u)+(uint64_t)(fragments%8u!=0u);
+    if(needed>SIZE_MAX){
+        ufs_error(error,error_size,"UFS allocation bitmap size overflows");
         return -1;
     }
+    inventory->bitmap_bytes=(size_t)needed;
     inventory->free_bitmap = calloc(
         inventory->bitmap_bytes == 0U ? 1U : inventory->bitmap_bytes, 1U);
     uint8_t *cg = malloc(inventory->summary.cylinder_group_size);

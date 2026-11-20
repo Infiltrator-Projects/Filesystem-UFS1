@@ -17,16 +17,19 @@ FetchContent_MakeAvailable(infiltratr_common)
 # Common is linked into the filesystem; its development files are not installed.
 set_property(DIRECTORY "${infiltratr_common_SOURCE_DIR}" PROPERTY EXCLUDE_FROM_ALL TRUE)
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/version.h" "#define LD_VERSION \"${PROJECT_VERSION}\"\n")
+# Production is V2-only. Historical source worker/fixture/Kconfig remains
+# in the repository for provenance and independent future qualification.
 add_library(ufs1-driver SHARED
- native/ufs_native.c native/ufs_worker.c
- compat/legacy_services.c compat/runtime_alloc.c
+ native/ufs_native.c
  module/ufs_module.c)
-set_source_files_properties(native/ufs_worker.c PROPERTIES
- COMPILE_DEFINITIONS "main=ifs_ufs_worker_main")
 set_target_properties(ufs1-driver PROPERTIES PREFIX "" OUTPUT_NAME "UFS1" SUFFIX ".so")
-target_compile_definitions(ufs1-driver PRIVATE _GNU_SOURCE _FILE_OFFSET_BITS=64 IFS_UFS_MAJOR=1)
-target_compile_options(ufs1-driver PRIVATE -Wall -Wextra -Wpedantic -Werror)
-target_link_options(ufs1-driver PRIVATE -Wl,-z,defs)
+target_compile_definitions(ufs1-driver PRIVATE
+ _GNU_SOURCE _FILE_OFFSET_BITS=64 IFS_UFS_MAJOR=1 IFS_UFS_V2_PRODUCTION=1)
+target_compile_options(ufs1-driver PRIVATE
+ -Wall -Wextra -Wpedantic -Werror -ffunction-sections -fdata-sections -fvisibility=hidden)
+target_link_options(ufs1-driver PRIVATE
+ -Wl,-z,defs -Wl,--gc-sections
+ "-Wl,--version-script=${CMAKE_CURRENT_SOURCE_DIR}/module/v2-only.map")
 target_include_directories(ufs1-driver PRIVATE
  "${CMAKE_CURRENT_SOURCE_DIR}/native" "${CMAKE_CURRENT_SOURCE_DIR}/compat"
  "${CMAKE_CURRENT_SOURCE_DIR}/include" "${CMAKE_CURRENT_BINARY_DIR}"
@@ -40,6 +43,9 @@ if(BUILD_TESTING)
    "${infiltratr_common_SOURCE_DIR}/include")
  target_link_libraries(ufs1-module-test PRIVATE ufs1-driver)
  add_test(NAME ufs1-module-interface COMMAND ufs1-module-test)
+ add_test(NAME ufs1-only-common-v2-export
+  COMMAND bash "${CMAKE_CURRENT_SOURCE_DIR}/tests/check_v2_exports.sh"
+    "$<TARGET_FILE:ufs1-driver>")
 endif()
 install(TARGETS ufs1-driver LIBRARY DESTINATION /System/Filesystems)
 
