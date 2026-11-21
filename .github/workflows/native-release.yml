@@ -43,6 +43,7 @@ jobs:
           bash tests/check_v2_exports.sh "$RUNNER_TEMP/native-root/System/Filesystems/UFS1.so"
           test "$(find "$RUNNER_TEMP/native-root" -name '*.ko' | wc -l)" = 0
       - name: Validate packaged portable and native Common V2 SO against BOOT
+        if: ${{ vars.IFS_BOOT_INTEGRATION_READY == 'true' }}
         run: |
           set -euo pipefail
           source tests/require-rebuilt-boot.sh
@@ -64,7 +65,7 @@ jobs:
 
   publish:
     needs: qualify
-    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: vars.IFS_BOOT_INTEGRATION_READY == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:
