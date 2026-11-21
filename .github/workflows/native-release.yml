@@ -45,15 +45,8 @@ jobs:
       - name: Validate packaged portable and native Common V2 SO against BOOT
         run: |
           set -euo pipefail
-          boot=infiltrator-boot_0.1.77_amd64.deb
-          curl -fsSL --retry 3 \
-            "https://github.com/Infiltrator-Projects/Boot/releases/download/v0.1.77/$boot" \
-            -o "$RUNNER_TEMP/$boot"
-          printf '%s  %s\n' \
-            c70fd0bec2d6a2728e9ceddb4149c58ef63955ecfe42184a18ea960ede6a1c5c \
-            "$RUNNER_TEMP/$boot" | sha256sum -c -
-          dpkg-deb -x "$RUNNER_TEMP/$boot" "$RUNNER_TEMP/boot"
-          validator="$RUNNER_TEMP/boot/usr/lib/infiltrator-boot/validate-module"
+          source tests/require-rebuilt-boot.sh
+          validator="$IFS_BOOT_VALIDATOR"
           for module in \
             "$RUNNER_TEMP/portable/System/Filesystems/UFS1.so" \
             "$RUNNER_TEMP/native-root/System/Filesystems/UFS1.so"; do
@@ -129,7 +122,7 @@ jobs:
             gh release create "$tag" dist/*.deb dist/*.run \
               --target "$GITHUB_SHA" \
               --title "UFS1 Common V2 firmware reader $version" \
-              --notes "One UFS1.so with source-owned hosted and embedded freestanding V2 reader. BOOT 0.1.77 validates portable and native source RUN shared objects; OVMF boots an EFI-stub kernel and initramfs from a real UFS1 inode/indirect-block disk image and rejects corrupted metadata without media modification. No V1 or Linux kernel module fallback."
+              --notes "One UFS1.so with source-owned hosted and embedded freestanding V2 reader. rebuilt BOOT validates portable and native source RUN shared objects; OVMF boots an EFI-stub kernel and initramfs from a real UFS1 inode/indirect-block disk image and rejects corrupted metadata without media modification. No V1 or Linux kernel module fallback."
           fi
           mkdir -p "$RUNNER_TEMP/immutable"
           gh release download "$tag" -p '*.deb' -p '*.run' --dir "$RUNNER_TEMP/immutable"
