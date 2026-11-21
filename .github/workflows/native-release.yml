@@ -1,8 +1,7 @@
 # SPDX-License-Identifier: GPL-3.0-or-later
 # Hosted V2 real file namespace qualified independently. Do not release a
-# BOOT provider until freestanding ELF, the production validator and OVMF
-# kernel/initramfs non-mutation tests pass. Never bundle Linux .ko as fallback.
-name: Qualify and release UFS1 BOOT-ready Common V2 DEB and native RUN
+# BOOT provider before integration exists. Never bundle Linux .ko as fallback.
+name: Qualify and release UFS1 independent Common V2 DEB and native RUN
 on:
   push:
     branches: [main]
@@ -42,30 +41,15 @@ jobs:
           test "$(find "$RUNNER_TEMP/native-root" -type f | wc -l)" = 2
           bash tests/check_v2_exports.sh "$RUNNER_TEMP/native-root/System/Filesystems/UFS1.so"
           test "$(find "$RUNNER_TEMP/native-root" -name '*.ko' | wc -l)" = 0
-      - name: Validate packaged portable and native Common V2 SO against BOOT
-        if: ${{ vars.IFS_BOOT_INTEGRATION_READY == 'true' }}
-        run: |
-          set -euo pipefail
-          source tests/require-rebuilt-boot.sh
-          validator="$IFS_BOOT_VALIDATOR"
-          for module in \
-            "$RUNNER_TEMP/portable/System/Filesystems/UFS1.so" \
-            "$RUNNER_TEMP/native-root/System/Filesystems/UFS1.so"; do
-            test -s "$module"
-            readelf -SW "$module" | grep -F .infiltrator_boot
-            "$validator" "$module"
-            ! nm -D --defined-only "$module" | grep -E 'infiltrator_filesystem_.*_v1'
-          done
-          echo UFS1_PORTABLE_AND_NATIVE_RUN_VALIDATOR_PASS
       - uses: actions/upload-artifact@v4
         with:
-          name: ufs1-boot-qualified-release
+          name: ufs1-common-v2-release
           path: dist/*
           if-no-files-found: error
 
   publish:
     needs: qualify
-    if: vars.IFS_BOOT_INTEGRATION_READY == 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
     runs-on: ubuntu-24.04
     timeout-minutes: 40
     permissions:
@@ -77,29 +61,7 @@ jobs:
         with:
           name: ufs1-boot-qualified-release
           path: dist
-      - name: Require exact-head UFS1 native and real BOOT OVMF success
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          set -euo pipefail
-          endpoint="repos/$GITHUB_REPOSITORY/actions/runs?head_sha=$GITHUB_SHA&per_page=100"
-          for attempt in $(seq 1 150); do
-            runs=$(gh api "$endpoint" --jq '.workflow_runs[] | .name + ":" + (.conclusion // .status)')
-            if printf '%s\n' "$runs" | grep -Fxq 'Qualify UFS1 native freestanding Common V2 ELF:failure' ||
-               printf '%s\n' "$runs" | grep -Fxq 'UFS1 independent shared object:failure'; then
-              echo "UFS1 OVMF or hosted test failed on this commit" >&2
-              exit 1
-            fi
-            if printf '%s\n' "$runs" | grep -Fxq 'Qualify UFS1 native freestanding Common V2 ELF:success' &&
-               printf '%s\n' "$runs" | grep -Fxq 'UFS1 independent shared object:success'; then
-              echo "UFS1_EXACT_HEAD_UEFI_AND_NATIVE_PASS $GITHUB_SHA"
-              exit 0
-            fi
-            sleep 10
-          done
-          echo "Exact-head firmware/hosted verification absent" >&2
-          exit 1
-      - name: Publish and verify immutable BOOT-ready UFS1 DEB and RUN
+      - name: Publish and verify immutable UFS1 Common V2 DEB and RUN
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -122,8 +84,8 @@ jobs:
           else
             gh release create "$tag" dist/*.deb dist/*.run \
               --target "$GITHUB_SHA" \
-              --title "UFS1 Common V2 firmware reader $version" \
-              --notes "One UFS1.so with source-owned hosted and embedded freestanding V2 reader. rebuilt BOOT validates portable and native source RUN shared objects; OVMF boots an EFI-stub kernel and initramfs from a real UFS1 inode/indirect-block disk image and rejects corrupted metadata without media modification. No V1 or Linux kernel module fallback."
+              --title "UFS1 Common V2 filesystem $version" \
+              --notes "UFS1.so contains source-owned hosted and freestanding Common V2 readers. Independent native filesystem, package and ABI tests qualify portable DEB and native RUN. BOOT and OVMF integration is not tested. No V1 or Linux kernel module fallback."
           fi
           mkdir -p "$RUNNER_TEMP/immutable"
           gh release download "$tag" -p '*.deb' -p '*.run' --dir "$RUNNER_TEMP/immutable"
