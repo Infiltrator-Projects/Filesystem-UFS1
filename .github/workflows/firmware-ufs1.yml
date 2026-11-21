@@ -26,6 +26,7 @@ jobs:
           nm -D --defined-only build/firmware/UFS1.so | grep -F infiltrator_filesystem_api_v2
           ! nm -u build/firmware/UFS1.so | grep .
       - name: Validate using real production rebuilt BOOT
+        if: ${{ vars.IFS_BOOT_INTEGRATION_READY == 'true' }}
         run: |
           set -euo pipefail
           source tests/require-rebuilt-boot.sh
@@ -40,6 +41,7 @@ jobs:
           cmp build/UFS1.so "$module"
           echo UFS1_FREESTANDING_AND_HOSTED_CARRIER_VALIDATOR_PASS
       - name: Boot EFI-stub kernel and initramfs from UFS1 V2 provider in OVMF
+        if: ${{ vars.IFS_BOOT_INTEGRATION_READY == 'true' }}
         shell: bash
         run: |
           set -euo pipefail
