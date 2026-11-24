@@ -328,7 +328,7 @@ static int format_impl(const IfsFsHostRuntimeV2 *h,uint32_t variant,
        h->volume_bytes%FMT_BSIZE ||
        h->volume_bytes<16ull*1024u*1024u ||
        h->volume_bytes>128ull*1024u*1024u)return IFS_FS_UNSUPPORTED;
-    for(unsigned i=0;i<UFS2_MAX_SESSIONS;++i)
+    for(unsigned i=0;i<UFS1_MAX_SESSIONS;++i)
         if(sessions[i].active)return IFS_FS_BUSY;
     if(!label)label="";
     size_t label_bytes=0u;
