@@ -205,6 +205,9 @@ static void decode_ufs_allocation(const uint8_t *window, size_t length,
         return;
 
     summary->allocation_totals_known = true;
+    /* BSD fs_volname and fs_old_inodefmt are fixed-width disk fields. */
+    memcpy(summary->volume_label,window+base+680u,32u);
+    summary->inode_format=(int32_t)read_u32(window+base+1324u,little);
     summary->block_size = block_size;
     summary->fragment_size = fragment_size;
     summary->fragments_per_block = fragments_per_block;
@@ -773,6 +776,7 @@ typedef struct {
     uint32_t block_count;
     uint32_t cylinder_group;
     uint16_t mode;
+    uint32_t uid,gid;
     bool directory;
     bool sparse;
     bool indirect;
@@ -1361,6 +1365,17 @@ static int inventory_collect_files(UfsInventory *inventory,
                 .inode = inode_number, .inode_offset = inode_offset, .size = size,
                 .first_block = (uint32_t)inventory->block_count, .block_count = 0U,
                 .cylinder_group = UINT32_MAX, .mode = mode,
+                /* 4.2BSD UFS1 stores 16-bit IDs at offsets 4/6;
+                 * 4.4BSD stores 32-bit IDs at 112/116. UFS2 always
+                 * uses 32-bit ownership at offsets 4/8. */
+                .uid = ufs1_variant(summary) ?
+                    (summary->inode_format<2 ?
+                        (little?infiltratr_load_le16(inode+4u):infiltratr_load_be16(inode+4u)) :
+                        read_u32(inode+112u,little)) : read_u32(inode+4u,little),
+                .gid = ufs1_variant(summary) ?
+                    (summary->inode_format<2 ?
+                        (little?infiltratr_load_le16(inode+6u):infiltratr_load_be16(inode+6u)) :
+                        read_u32(inode+116u,little)) : read_u32(inode+8u,little),
                 .directory = type == UFS_IFDIR, .sparse = false,
                 .indirect = false, .fragmented = false,
             };
@@ -1647,6 +1662,19 @@ static int ufs_v2_fill_entry(IfsFsEntryV2 *entry,
     entry->size_bytes=record->size;
     entry->attributes=record->mode;
     entry->type=record->directory?IFS_FS_ENTRY_DIRECTORY:IFS_FS_ENTRY_FILE;
+    return IFS_FS_OK;
+}
+/* Resolve through the existing inode inventory and directory decoder. */
+int ufs_metadata_host_v2(void *handle,const char *path,IfsFsMetadataV2 *out)
+{
+    const UfsInventory *inv=handle;
+    const UfsFileRecord *record=NULL;
+    if(!inv || !inv->host || !out || out->structure_bytes<sizeof(*out))
+        return IFS_FS_INVALID;
+    int rc=ufs_v2_find_path(inv,path,&record);
+    if(rc!=IFS_FS_OK)return rc;
+    *out=(IfsFsMetadataV2){.structure_bytes=sizeof(*out),.mask=IFS_FS_META_GET_MODE,
+        .mode=record->mode,.owner=record->uid,.group=record->gid};
     return IFS_FS_OK;
 }
 int ufs_stat_host_v2(void *handle,const char *path,IfsFsEntryV2 *entry)
