@@ -67,6 +67,11 @@ add_custom_command(TARGET ufs1-driver POST_BUILD
  VERBATIM)
 
 if(BUILD_TESTING)
+ add_executable(ufs-native-format-test tests/test_format.c)
+ target_include_directories(ufs-native-format-test PRIVATE "${infiltratr_common_SOURCE_DIR}/include")
+ target_link_libraries(ufs-native-format-test PRIVATE ${CMAKE_DL_LIBS})
+ target_compile_options(ufs-native-format-test PRIVATE -Wall -Wextra -Wpedantic -Werror)
+ add_test(NAME ufs1-native-format COMMAND sh "${CMAKE_CURRENT_SOURCE_DIR}/tests/format_media.sh" "$<TARGET_FILE:ufs-native-format-test>" "$<TARGET_FILE:ufs1-driver>")
  add_executable(ufs1-module-test tests/test_module.c)
  target_include_directories(ufs1-module-test PRIVATE
    "${CMAKE_CURRENT_SOURCE_DIR}/include"
