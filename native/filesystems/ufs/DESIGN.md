@@ -1,5 +1,15 @@
 # UFS Filesystem Design and Ownership
 
+## Current production architecture
+
+The current descriptor declares probe, mount, stat, read and format, superseding the old probe-only description. The historical analysis and relocation internals do not establish a Common V2 mutation contract. The canonical entry point is `infiltrator_filesystem_api_v2`. Consumers must negotiate the actual profile and operation masks and use bounded, partition-relative host I/O. A source-level callback does not by itself establish that every format variant or host profile is qualified.
+
+The canonical package installs one Common V2 shared object and its technical PDF. The native RUN downloads and verifies the exact source revision. No independent filesystem-specific kernel or EFI driver or FUSE substitute is distributed. See the [current provider README](../../../README.md) for current scope and the linked qualification evidence.
+
+## Historical source and qualification record
+
+> The following material preserves inherited design, original-format semantics, source attribution and earlier qualification evidence. Earlier implementation status, separate driver layouts, packaging instructions and ABI statements are historical, not the present release contract. No new test result is claimed by this record.
+
 > **Working source (23 October 2026).** This filesystem's `linux/` directory contains the actual copied Linux implementation source, preserved with its original attribution and available for direct modification. It is not a replaceable research-only reference tree. The old independently-rewrite-first policy and any old directory-layout/refresh language below are historical, not a restriction on editing this working baseline. Only explicitly qualified drivers appear in `data/native-filesystems.tsv`.
 
 
@@ -20,9 +30,9 @@ Defragmenter, BOOT, or the kernel, not a second on-disk parser. Shared
 historical UFS algorithm lineage does not change the two independent
 on-disk distribution identities.
 
-## Current implementation state
+## Historical implementation state
 
-UFS is currently **imported-source development state**.
+UFS was originally documented as **imported-source development state**.
 
 The independent UFS1/UFS2 repositories now own project-authored hosted
 on-disk C engines and test pipelines. **This historical Filesystems
@@ -34,7 +44,7 @@ The imported files retain their upstream provenance, licences, filenames and
 implementation boundaries. The former top-level `kernel/` directory was a
 legacy staging path and did not make that source project-authored.
 
-## Current directory layout
+## Historical directory layout
 
 ```text
 native/filesystems/ufs/
