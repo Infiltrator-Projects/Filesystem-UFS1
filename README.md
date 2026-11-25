@@ -1,30 +1,36 @@
-# Filesystem-UFS1 — UFS1.so
+# Filesystem-UFS1
 
-Independent **UFS1** on-disk filesystem driver for InfiltratorOS.
-This module rejects UFS2 media and installs only `/System/Filesystems/UFS1.so`.
+## 1. Purpose and format scope
 
-This is a C port of the validated UFS1 execution path from the original
-[Filesystem-UFS](https://github.com/Infiltrator-Projects/Filesystem-UFS2)
-repository (snapshot `a64350b9f7bd13456689415f7c52171439d72758`).
-Its C engine retains UFS1 little-endian and big-endian identification
-and the historical analysis/relayout internals. The exported Common V2
-provider currently qualifies **CORE probe only**; the retained Defrag,
-Growth Defrag and Recover internals are not exported or qualified through
-the new V2 provider interface. UFS2's Test Media creator and UFS2-specific
-raw verifier deliberately do not belong to this module.
+Unix File System UFS1, distinct from UFS2. This repository owns the format-specific implementation of `UFS1.so` for InfiltratorOS.
 
-Build: `cmake -S . -B build -DCMAKE_BUILD_TYPE=Release && cmake --build build && ctest --test-dir build --output-on-failure`.
+## 2. On-disk architecture and invariants
 
-**Qualification limitation:** this split needs independent real UFS1 media,
-allocation and mutation/recovery validation before a finished-driver claim.
-The exported provider ABI is Common V2. UFS1 and UFS2 remain distinct disk formats.
+Cylinder groups, inode tables, allocation bitmaps, direct and indirect references and native byte order govern ownership. Preserve UFS1 little- and big-endian interpretations; reject UFS2 media. Inventory construction must preserve host I/O failures rather than publish partial allocation state.
 
-## Installer files
+## 3. Common V2 implementation and capabilities
 
-- `/System/Filesystems/UFS1.so`
-- `/System/Resources/Documentation/Filesystem-UFS1.pdf`
-- `/System/Kernel/Filesystems/ufs1.ko`
+The current descriptor declares probe, mount, stat, read and format, superseding the old probe-only description. The historical analysis and relocation internals do not establish a Common V2 mutation contract. The canonical entry point is `infiltrator_filesystem_api_v2`. Consumers must negotiate the actual profile and operation masks and use bounded, partition-relative host I/O. A source-level callback does not by itself establish that every format variant or host profile is qualified.
 
-The published Debian package installs these three regular files. A manual native RUN compiles the shared object and Linux adapter locally, generates the PDF, and replaces all three files. It uses the running kernel headers by default. Use `--kernel-build DIRECTORY` for a prepared kernel build with `Module.symvers`. The kernel module is stored for manual use.
+## 4. Integrity, mutation, allocation and recovery
 
-InfiltratorOS calls `--system-package-mode` and decides which outputs need updating. Its worker builds a missing or older SO, repairs the PDF independently, and stores the matching released kernel module when available. Use `--build-only --output DIRECTORY` to build a Debian package.
+Lazy inventory fault injection must occur before caching so the error path is actually exercised. Native allocation, mutation and recovery require specific qualification; UFS2 fixtures are not UFS1 evidence. For destructive operations, require the applicable exclusive writable host, durability contract and format-specific validation. Never silently substitute a kernel or FUSE driver or treat a rejected or unavailable operation as success. Preserve original disk-format semantics; relocation and recovery are separate from ordinary file I/O.
+
+## 5. Build, installation and release
+
+The target installation is `/System/Filesystems/UFS1.so` and `/System/Resources/Documentation/Filesystem-UFS1.pdf`. The project release policy is a portable amd64 DEB and a CPU-native source-first RUN, with GitHub's automatic source archive; do not treat this policy statement as verification of the current installer payload. The release workflow is the authoritative executable build and package specification. Historical adapters and test artifacts are not additional production filesystem authorities.
+
+## 6. Qualification and limitations
+
+[Recorded qualification workflow](https://github.com/Infiltrator-Projects/Filesystem-UFS1/actions/runs/45526886448) · [Current workflows](https://github.com/Infiltrator-Projects/Filesystem-UFS1/actions?query=branch%3Amain). A successful workflow establishes the tested scope only, not complete original-format parity, physical-media crash safety, or production BOOT/kernel integration. Use disposable images for destructive qualification.
+
+## 7. Technical references and provenance
+
+- [Provider implementation](module/ufs_module.c)
+- [Native design or source provenance](native/filesystems/ufs/DESIGN.md)
+- [Migration and source history](MIGRATION_STATUS.md)
+- [Original-format reference source](docs/UFS1.pages) and [PDF](docs/UFS1.pdf)
+- [Project philosophy](docs/PHILOSOPHY.md)
+- [Common ABI](https://github.com/Infiltrator-Projects/Libraries)
+
+The original-format reference and historical migration notes describe different evidence from the current production provider. When descriptions disagree, the current exported descriptor, implementation, executable tests and exact-revision release evidence take precedence.
