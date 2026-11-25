@@ -82,7 +82,19 @@
 #define UFS_CG_FREEOFF_OFFSET 96U
 #define UFS_CG_MAGIC 0x00090255U
 
+/* Each provider must prefer its own standard primary superblock. A UFS1
+ * volume with 64 KiB blocks can place a redundant superblock at 65536;
+ * selecting that copy before the real 8192-byte primary makes a valid
+ * native writable volume appear to require backup-superblock recovery.
+ * Keep alternate candidates available for read-only recognition, while
+ * the mutation engine independently requires the actual primary. */
+#if IFS_UFS_MAJOR == 1
+static const uint64_t UFS_CANDIDATES[] = {8192U, 65536U, 0U, 262144U};
+#elif IFS_UFS_MAJOR == 2
 static const uint64_t UFS_CANDIDATES[] = {65536U, 8192U, 0U, 262144U};
+#else
+#error "UFS primary superblock order requires an explicit major version"
+#endif
 
 static const uint8_t UFS1_LE_MAGIC[4] = {0x54U, 0x19U, 0x01U, 0x00U};
 static const uint8_t UFS1_BE_MAGIC[4] = {0x00U, 0x01U, 0x19U, 0x54U};
