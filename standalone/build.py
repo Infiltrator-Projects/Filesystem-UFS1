@@ -43,9 +43,9 @@ def install_deps():
         run([*apt, "update"])
         run([*apt, "install", "-y", "--no-install-recommends", *packages])
 
-# The UFS1 driver pins Libraries/Common in CMake. Embed that exact source
-# with every RUN so installing UFS1 never fetches external driver source.
-COMMON_REVISION = "d23a52693fd3212368d327e1c1302e07ae9510ec"
+# The source-first RUN fetches the pinned UFS1 revision, then this builder
+# fetches the exact Common revision used by CMake into its temporary checkout.
+COMMON_REVISION = "965e5d191a6f7d078f5d07218dbaabfb00fa1a20"
 COMMON_ROOT = ROOT / "backend-common"
 
 def prepare_release_source():
