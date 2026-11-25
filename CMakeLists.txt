@@ -21,7 +21,8 @@ file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/version.h" "#define LD_VERSION \"${PROJE
 # in the repository for provenance and independent future qualification.
 add_library(ufs1-driver SHARED
  native/ufs_native.c
- module/ufs_module.c)
+ module/ufs_module.c
+ module/ufs1_mutation.c)
 set_target_properties(ufs1-driver PROPERTIES PREFIX "" OUTPUT_NAME "UFS1" SUFFIX ".so")
 target_compile_definitions(ufs1-driver PRIVATE
  _GNU_SOURCE _FILE_OFFSET_BITS=64 IFS_UFS_MAJOR=1 IFS_UFS_V2_PRODUCTION=1)

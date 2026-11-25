@@ -1,12 +1,16 @@
 /* SPDX-License-Identifier: GPL-3.0-or-later
  * UFS1: strict Common V2 probe, read-only lifecycle, and volume query.
  * The independent UFS engine remains the only decoder for disk geometry.
- * No unqualified file operations, relocation, writes, or legacy ABI exports.
+ * Hosted writes use the native clean one-group profile; relocation and
+ * unqualified layouts remain unavailable. No legacy ABI exports.
  */
 #include <infiltratr/filesystem_module_v2.h>
 #include <stdint.h>
 #include <stdatomic.h>
 #include "ufs_native.h"
+#ifndef IFS_UFS_FIRMWARE_BUILD
+#include "ufs1_mutation.h"
+#endif
 #ifdef IFS_UFS_FIRMWARE_BUILD
 extern void ifs_ufs_firmware_bind_host(const IfsFsHostRuntimeV2 *);
 #endif
@@ -56,8 +60,7 @@ static int probe(const IfsFsHostRuntimeV2 *host, uint32_t *variant)
     return leave_operation(probe_impl(host,variant));
 }
 
-/* This is a strictly read-only geometry session, not a writable filesystem
- * mount. The superblock must have validated allocation/cylinder geometry;
+/* The session uses validated geometry and a separately bounded hosted writer. The superblock must have validated allocation/cylinder geometry;
  * recognising a four-byte UFS magic alone is NOT enough for volume query.
  * Generation tokens reject stale callers without dereferencing freed memory.
  */
@@ -69,7 +72,10 @@ static int probe(const IfsFsHostRuntimeV2 *host, uint32_t *variant)
 typedef struct {
     uintptr_t active;
     IfsFsVolumeInfoV2 info;
-    IfsFsHostRuntimeV2 host;
+    IfsFsHostRuntimeV2 host,read_host;
+#ifndef IFS_UFS_FIRMWARE_BUILD
+    Ufs1Mutation *writer;
+#endif
     LdUfsSummary summary;
     void *map_inventory;
 } Ufs1Session;
@@ -146,8 +152,13 @@ static int mount_volume_impl(const IfsFsHostRuntimeV2 *host, void **volume,
         return IFS_FS_INVALID;
     *volume = NULL;
     if (!ifs_fs_host_v2_valid(host)) return IFS_FS_INVALID;
-    if (!(host->capabilities & IFS_FS_HOST_READ_ONLY))
-        return IFS_FS_ACCESS;
+    const int writable=!(host->capabilities & IFS_FS_HOST_READ_ONLY);
+#ifdef IFS_UFS_FIRMWARE_BUILD
+    if(writable)return IFS_FS_ACCESS;
+#else
+    for(unsigned i=0;i<UFS1_MAX_SESSIONS;++i)
+        if(sessions[i].active && (writable || sessions[i].writer))return IFS_FS_BUSY;
+#endif
     slot = unused_session();
     if (!slot || session_sequence == UINTPTR_MAX)
         return IFS_FS_BUSY;
@@ -163,6 +174,19 @@ static int mount_volume_impl(const IfsFsHostRuntimeV2 *host, void **volume,
         return IFS_FS_CORRUPT;
     slot->info = measured;
     retain_host(&slot->host, host);
+    slot->read_host=slot->host;
+    slot->read_host.capabilities &= ~(IFS_FS_HOST_EXCLUSIVE|IFS_FS_HOST_DURABLE|IFS_FS_HOST_DISCARD);
+    slot->read_host.capabilities |= IFS_FS_HOST_READ_ONLY;
+    slot->read_host.write_at=NULL;slot->read_host.flush=NULL;slot->read_host.discard=NULL;
+#ifndef IFS_UFS_FIRMWARE_BUILD
+    if(writable) {
+        rc=ufs1_mutation_open(&slot->host,&summary,&slot->writer);
+        if(rc!=IFS_FS_OK) {
+            slot->host=(IfsFsHostRuntimeV2){0};slot->read_host=(IfsFsHostRuntimeV2){0};
+            return rc;
+        }
+    }
+#endif
     slot->summary = summary;
     slot->map_inventory = NULL;
     slot->active = ++session_sequence;
@@ -183,11 +207,17 @@ static int unmount_volume_impl(void *volume)
     if (slot->map_inventory)
         ufs_map_host_close_v2(slot->map_inventory);
     slot->map_inventory = NULL;
+    int rc=IFS_FS_OK;
+#ifndef IFS_UFS_FIRMWARE_BUILD
+    if(ufs1_mutation_faulted(slot->writer))rc=IFS_FS_IO_ERROR;
+    ufs1_mutation_close(slot->writer);slot->writer=NULL;
+#endif
+    slot->read_host=(IfsFsHostRuntimeV2){0};
     slot->host = (IfsFsHostRuntimeV2){0};
     slot->summary = (LdUfsSummary){0};
     slot->active = 0u;
     slot->info = (IfsFsVolumeInfoV2){0};
-    return IFS_FS_OK;
+    return rc;
 }
 static int unmount_volume(void *volume)
 {
@@ -199,6 +229,9 @@ static int query_volume_impl(void *volume, IfsFsVolumeInfoV2 *info)
     Ufs1Session *slot = find_session(volume);
     if (!slot || !info || info->structure_bytes < sizeof(*info))
         return IFS_FS_INVALID;
+ #ifndef IFS_UFS_FIRMWARE_BUILD
+    if(ufs1_mutation_faulted(slot->writer))return IFS_FS_IO_ERROR;
+#endif
     *info = slot->info;
     return IFS_FS_OK;
 }
@@ -212,8 +245,11 @@ static int ensure_inventory(Ufs1Session *slot)
 #ifdef IFS_UFS_FIRMWARE_BUILD
     ifs_ufs_firmware_bind_host(&slot->host);
 #endif
+ #ifndef IFS_UFS_FIRMWARE_BUILD
+    if(ufs1_mutation_faulted(slot->writer))return IFS_FS_IO_ERROR;
+#endif
     if (!slot->map_inventory)
-        return ufs_map_host_open_v2(&slot->host, &slot->summary,
+        return ufs_map_host_open_v2(&slot->read_host, &slot->summary,
                                     &slot->map_inventory);
     return IFS_FS_OK;
 }
@@ -281,31 +317,70 @@ static int read_file(void *volume, const char *path, uint64_t offset, void *dest
     if (!enter_operation()) return IFS_FS_BUSY;
     return leave_operation(read_file_impl(volume,path,offset,destination,length));
 }
+#ifndef IFS_UFS_FIRMWARE_BUILD
+/* Drop stale read inventory before a mutation; the next stat/list/map/read
+ * independently walks the newly committed on-disk records. */
+static void mutation_refresh(Ufs1Session *slot)
+{
+    if(slot->map_inventory)ufs_map_host_close_v2(slot->map_inventory);
+    slot->map_inventory=NULL;
+}
+static void mutation_counts(Ufs1Session *slot)
+{
+    ufs1_mutation_counts(slot->writer,&slot->summary.free_blocks,&slot->summary.free_fragments);
+    slot->info.free_bytes=(slot->summary.free_blocks*slot->summary.fragments_per_block+
+        slot->summary.free_fragments)*slot->summary.fragment_size;
+}
+static int create_file(void *volume,const char *path,uint32_t type)
+{
+    if(!enter_operation())return IFS_FS_BUSY;
+    Ufs1Session *slot=find_session(volume);
+    if(!slot)return leave_operation(IFS_FS_INVALID);
+    if(!slot->writer)return leave_operation(IFS_FS_ACCESS);
+    mutation_refresh(slot);
+    int rc=ufs1_mutation_create(slot->writer,path,type);
+    if(rc==IFS_FS_OK)mutation_counts(slot);
+    return leave_operation(rc);
+}
+static int write_file(void *volume,const char *path,uint64_t offset,const void *data,uint32_t bytes)
+{
+    if(!enter_operation())return IFS_FS_BUSY;
+    Ufs1Session *slot=find_session(volume);
+    if(!slot)return leave_operation(IFS_FS_INVALID);
+    if(!slot->writer)return leave_operation(IFS_FS_ACCESS);
+    mutation_refresh(slot);
+    int rc=ufs1_mutation_write(slot->writer,path,offset,data,bytes);
+    if(rc==IFS_FS_OK)mutation_counts(slot);
+    return leave_operation(rc);
+}
+#endif
 static const IfsFsCoreOpsV2 core = {
     .header = {IFS_FS_GROUP_ABI_V2, sizeof(IfsFsCoreOpsV2),
                IFS_FS_GROUP_CORE, 0u,
                IFS_FS_CORE_PROBE | IFS_FS_CORE_MOUNT |
-               IFS_FS_CORE_STAT | IFS_FS_CORE_LIST | IFS_FS_CORE_READ},
+               IFS_FS_CORE_STAT | IFS_FS_CORE_LIST | IFS_FS_CORE_READ
+#ifndef IFS_UFS_FIRMWARE_BUILD
+               | IFS_FS_CORE_CREATE | IFS_FS_CORE_WRITE
+#endif
+    },
     .probe = probe,
     .mount = mount_volume,
     .unmount = unmount_volume,
     .stat = stat_path,
     .directory_entry = directory_entry,
     .read = read_file
+#ifndef IFS_UFS_FIRMWARE_BUILD
+    , .create=create_file,.write=write_file
+#endif
 };
 #ifndef IFS_UFS_FIRMWARE_BUILD
 /* Native little-endian UFS1 format, using the FreeBSD FFS on-disk
  * structures documented in sys/ufs/ffs/fs.h and sys/ufs/ufs/dinode.h.
- * Initial qualification: one cylinder group, 16 KiB blocks, 4 KiB
- * fragments, 256 inodes, no soft updates, snapshots or metadata hashes.
+ * One cylinder group: 16 KiB/4 KiB up to 128 MiB, or 64 KiB/8 KiB
+ * up to 2 GiB with 512 inodes. No soft updates, snapshots or metadata hashes.
  * All disk access is through the exclusive Common V2 host lease.
  * An independent fsck_ffs run gates release of the resulting media. */
-enum { FMT_BSIZE=16384u,FMT_FSIZE=4096u,FMT_FRAG=4u,
-       FMT_IPG=256u,FMT_INODE=128u,FMT_PRIMARY=8192u,
-       FMT_SBLK=(FMT_PRIMARY+8192u+FMT_BSIZE-1u)/FMT_BSIZE*FMT_FRAG,
-       FMT_CBLK=FMT_SBLK+FMT_FRAG,FMT_IBLK=FMT_CBLK+FMT_FRAG,
-       FMT_DBLK=FMT_IBLK+(FMT_IPG*FMT_INODE)/FMT_FSIZE,
-       FMT_IUSED=174u,FMT_FREE=FMT_IUSED+FMT_IPG/8u };
+enum { FMT_INODE=128u,FMT_PRIMARY=8192u,FMT_IUSED=174u };
 static void fmt16(uint8_t *p,uint32_t x)
 {p[0]=(uint8_t)x;p[1]=(uint8_t)(x>>8);}
 static void fmt32(uint8_t *p,uint32_t x)
@@ -324,10 +399,19 @@ static int format_impl(const IfsFsHostRuntimeV2 *h,uint32_t variant,
     if((h->capabilities&IFS_FS_HOST_READ_ONLY) ||
        !(h->capabilities&IFS_FS_HOST_EXCLUSIVE) ||
        !(h->capabilities&IFS_FS_HOST_DURABLE))return IFS_FS_ACCESS;
+    const int large=h->volume_bytes>128ull*1024u*1024u;
+    const uint32_t FMT_BSIZE=large?65536u:16384u;
+    const uint32_t FMT_FSIZE=large?8192u:4096u;
+    const uint32_t FMT_FRAG=FMT_BSIZE/FMT_FSIZE;
+    const uint32_t FMT_IPG=large?512u:256u;
+    const uint32_t FMT_SBLK=(FMT_PRIMARY+8192u+FMT_BSIZE-1u)/FMT_BSIZE*FMT_FRAG;
+    const uint32_t FMT_CBLK=FMT_SBLK+FMT_FRAG,FMT_IBLK=FMT_CBLK+FMT_FRAG;
+    const uint32_t FMT_DBLK=FMT_IBLK+(FMT_IPG*FMT_INODE)/FMT_FSIZE;
+    const uint32_t FMT_FREE=FMT_IUSED+FMT_IPG/8u;
     if(variant!=1u || flags || h->logical_sector_bytes>FMT_FSIZE ||
        h->volume_bytes%FMT_BSIZE ||
        h->volume_bytes<16ull*1024u*1024u ||
-       h->volume_bytes>128ull*1024u*1024u)return IFS_FS_UNSUPPORTED;
+       h->volume_bytes>2ull*1024u*1024u*1024u)return IFS_FS_UNSUPPORTED;
     for(unsigned i=0;i<UFS1_MAX_SESSIONS;++i)
         if(sessions[i].active)return IFS_FS_BUSY;
     if(!label)label="";
@@ -364,7 +448,7 @@ static int format_impl(const IfsFsHostRuntimeV2 *h,uint32_t variant,
     int rc=IFS_FS_OK;
     /* Revoke all standard candidate signatures and the intended backup
      * before writing any allocation metadata. Never touch other volumes. */
-    static const uint64_t candidates[]={0u,8192u,65536u,262144u,
+    const uint64_t candidates[]={0u,8192u,65536u,262144u,
                                         (uint64_t)FMT_SBLK*FMT_FSIZE};
     for(unsigned i=0;i<sizeof(candidates)/sizeof(candidates[0]);++i) {
         rc=fmt_write(h,candidates[i],block,8192u);
@@ -427,15 +511,15 @@ static int format_impl(const IfsFsHostRuntimeV2 *h,uint32_t variant,
     fmt32(sb+48,FMT_BSIZE);fmt32(sb+52,FMT_FSIZE);fmt32(sb+56,FMT_FRAG);
     fmt32(sb+60,8u);fmt32(sb+68,60u);
     fmt32(sb+72,~(FMT_BSIZE-1u));fmt32(sb+76,~(FMT_FSIZE-1u));
-    fmt32(sb+80,14u);fmt32(sb+84,12u);fmt32(sb+88,1u);
-    fmt32(sb+92,FMT_BSIZE/4u);fmt32(sb+96,2u);
-    fmt32(sb+100,3u);fmt32(sb+104,FMT_FSIZE);
+    fmt32(sb+80,large?16u:14u);fmt32(sb+84,large?13u:12u);fmt32(sb+88,1u);
+    fmt32(sb+92,FMT_BSIZE/4u);fmt32(sb+96,large?3u:2u);
+    fmt32(sb+100,large?4u:3u);fmt32(sb+104,FMT_FSIZE);
     const uint32_t nindir=FMT_BSIZE/4u;
     fmt32(sb+116,nindir);fmt32(sb+120,FMT_BSIZE/FMT_INODE);
     fmt32(sb+124,FMT_FSIZE/512u);fmt32(sb+136,1u);
     fmt32(sb+144,now);fmt32(sb+148,id2);
     fmt32(sb+152,FMT_DBLK);fmt32(sb+156,FMT_FSIZE);fmt32(sb+160,cgsize);
-    fmt32(sb+168,total*8u);fmt32(sb+172,total*8u);
+    fmt32(sb+168,total*(FMT_FSIZE/512u));fmt32(sb+172,total*(FMT_FSIZE/512u));
     fmt32(sb+176,1u);fmt32(sb+180,1u);
     fmt32(sb+184,FMT_IPG);fmt32(sb+188,total);
     fmt32(sb+192,1u);fmt32(sb+196,nbfree);
