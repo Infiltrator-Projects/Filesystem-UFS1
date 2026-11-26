@@ -178,6 +178,42 @@ int main(int argc,char **argv)
     }
     CHECK(fragmented && logical==(uint64_t)14u*block);
     CHECK(core->unmount(mount)==IFS_FS_OK);
+    CHECK(core->mount(&h,&mount,&info)==IFS_FS_OK && mount);
+    uint64_t repaired=99u,moved=0u;
+    CHECK(map->recover(mount,0u,&repaired)==IFS_FS_OK && !repaired);
+    CHECK(map->plan(mount,"/",0u,&plan)==IFS_FS_OK && plan);
+    CHECK(map->execute(mount,plan,&moved)==IFS_FS_OK && moved>0u);
+    CHECK(map->verify(mount,plan)==IFS_FS_OK);
+    map->release_plan(mount,plan);plan=NULL;
+    CHECK(map->plan(mount,"/",10u,&plan)==IFS_FS_OK && plan);
+    CHECK(map->execute(mount,plan,&moved)==IFS_FS_OK);
+    CHECK(map->verify(mount,plan)==IFS_FS_OK);
+    map->release_plan(mount,plan);plan=NULL;
+    CHECK(core->unmount(mount)==IFS_FS_OK);
+    CHECK(core->mount(&ro,&mount,&info)==IFS_FS_OK && mount);
+    for(uint32_t i=0;i<14u;++i) {
+        CHECK(core->read(mount,"/alpha",(uint64_t)i*block,actual,block)==IFS_FS_OK);
+        CHECK(!memcmp(actual,data,block));
+    }
+    CHECK(core->read(mount,"/tiny",0u,actual,block/2u+1u)==IFS_FS_OK);
+    CHECK(!memcmp(actual,data,block/2u+1u));
+    CHECK(core->read(mount,"/beta",0u,actual,block)==IFS_FS_OK && !memcmp(actual,data,block));
+    CHECK(core->read(mount,"/edge",0u,actual,1u)==IFS_FS_OK && actual[0]==data[0]);
+    first=0u;logical=0u;prev=0u;
+    for(;;) {
+        IfsFsExtentV2 ext[16]={{0}};uint32_t count=0u;
+        int rc=map->map(mount,"/alpha",first,ext,16u,&count);
+        if(rc==IFS_FS_END){CHECK(!count);break;}
+        CHECK(rc==IFS_FS_OK && count);
+        for(uint32_t i=0;i<count;++i) {
+            CHECK(ext[i].logical_offset==logical && ext[i].length);
+            CHECK(!logical || ext[i].physical_offset==prev);
+            logical+=ext[i].length;prev=ext[i].physical_offset+ext[i].length;
+        }
+        first+=count;
+    }
+    CHECK(logical==(uint64_t)14u*block);
+    CHECK(core->unmount(mount)==IFS_FS_OK);
     puts("UFS1 native format, create, write, fragmentation and independent reopen PASS");
     result=0;
 done:

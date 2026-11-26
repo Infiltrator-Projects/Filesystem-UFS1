@@ -14,4 +14,8 @@ void ufs1_mutation_counts(const Ufs1Mutation *, uint64_t *, uint64_t *);
 void ufs1_mutation_close(Ufs1Mutation *);
 int ufs1_relocation_plan(Ufs1Mutation *,const char *,uint32_t,Ufs1RelocationPlan **);
 void ufs1_relocation_release(Ufs1Mutation *,Ufs1RelocationPlan *);
+int ufs1_relocation_marker(const IfsFsHostRuntimeV2 *);
+int ufs1_relocation_recover(const IfsFsHostRuntimeV2 *,int,uint64_t *,IfsFsVolumeInfoV2 *);
+int ufs1_relocation_execute(Ufs1Mutation *,Ufs1RelocationPlan *,uint64_t *);
+int ufs1_relocation_verify(Ufs1Mutation *,Ufs1RelocationPlan *);
 #endif
