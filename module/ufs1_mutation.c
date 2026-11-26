@@ -748,7 +748,9 @@ static int redo_read(void *context,uint64_t at,void *out,uint32_t bytes)
 static int redo_open(const IfsFsHostRuntimeV2 *h,const RedoLayout *l,
                      const uint8_t *image,Ufs1Mutation **out)
 {
-    IfsFsHostRuntimeV2 overlay=*h;
+    IfsFsHostRuntimeV2 overlay={0};
+    size_t host_bytes=h->structure_bytes<sizeof(overlay)?h->structure_bytes:sizeof(overlay);
+    memcpy(&overlay,h,host_bytes);overlay.structure_bytes=(uint32_t)host_bytes;
     overlay.read_at=redo_read;
     redo_overlay.base=h;redo_overlay.layout=l;redo_overlay.image=image;
     LdUfsSummary summary;
@@ -757,6 +759,34 @@ static int redo_open(const IfsFsHostRuntimeV2 *h,const RedoLayout *l,
     redo_overlay.base=NULL;redo_overlay.layout=NULL;redo_overlay.image=NULL;
     if(rc==IFS_FS_OK)(*out)->host=h;
     return rc;
+}
+/* A replay may encounter any mix of already-published and original
+ * metadata, including interrupted logical-sector writes. Every observed
+ * byte must belong to the recorded before/after state (or the temporary
+ * dirty indication). Do not let an unrelated stale record rewrite media. */
+static int redo_current_matches(const IfsFsHostRuntimeV2 *h,const RedoLayout *l,
+                                const uint8_t *images)
+{
+    uint8_t *current=h->allocate(h->context,l->bsize);
+    if(!current)return IFS_FS_NO_MEMORY;
+    int rc=IFS_FS_OK;
+    for(unsigned i=0;i<REDO_RANGES && rc==IFS_FS_OK;++i) {
+        for(uint32_t offset=0u;offset<l->len[i];) {
+            uint32_t n=l->len[i]-offset;
+            if(n>l->bsize)n=l->bsize;
+            rc=ifs_fs_host_read_bytes_v2(h,l->at[i]+offset,current,n);
+            if(rc!=IFS_FS_OK)break;
+            const uint8_t *old=images+l->pos[i]+offset;
+            const uint8_t *next=old+l->half;
+            for(uint32_t j=0;j<n;++j) {
+                if(current[j]==old[j] || current[j]==next[j] ||
+                   (i<2u && offset+j==209u && !current[j]))continue;
+                rc=IFS_FS_CORRUPT;break;
+            }
+            offset+=n;
+        }
+    }
+    h->release(h->context,current);return rc;
 }
 /* Before any replay write, both snapshots must independently describe the
  * same complete namespace. Every changed data or indirect pointer must
@@ -767,7 +797,8 @@ static int redo_validate(const IfsFsHostRuntimeV2 *h,const RedoLayout *l,
                          IfsFsVolumeInfoV2 *info)
 {
     Ufs1Mutation *old=NULL,*next=NULL;
-    int rc=redo_open(h,l,images,&old);
+    int rc=redo_current_matches(h,l,images);
+    if(rc==IFS_FS_OK)rc=redo_open(h,l,images,&old);
     if(rc==IFS_FS_OK)rc=redo_open(h,l,images+l->half,&next);
     if(rc!=IFS_FS_OK)goto done;
     if(old->bsize!=l->bsize || next->bsize!=l->bsize ||
@@ -779,6 +810,17 @@ static int redo_validate(const IfsFsHostRuntimeV2 *h,const RedoLayout *l,
        !placement_free(next,next->cg+next->freeoff,first,l->fragments) ||
        (uint64_t)old->counts.blocks*old->frag+old->counts.frags !=
        (uint64_t)next->counts.blocks*next->frag+next->counts.frags) {
+        rc=IFS_FS_CORRUPT;goto done;
+    }
+    uint8_t normalized_sb[SB_BYTES];
+    memcpy(normalized_sb,next->sb,SB_BYTES);
+    /* Only count summaries and publication timestamps are mutable. */
+    memcpy(normalized_sb+32u,old->sb+32u,4u);
+    memcpy(normalized_sb+192u,old->sb+192u,16u);
+    memcpy(normalized_sb+1008u,old->sb+1008u,32u);
+    memcpy(normalized_sb+1072u,old->sb+1072u,8u);
+    memcpy(normalized_sb+1352u,old->sb+1352u,4u);
+    if(memcmp(normalized_sb,old->sb,SB_BYTES)) {
         rc=IFS_FS_CORRUPT;goto done;
     }
     uint8_t *buf=h->allocate(h->context,4u*l->bsize);

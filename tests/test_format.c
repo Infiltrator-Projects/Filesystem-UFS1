@@ -111,6 +111,28 @@ static int crash_recovery(const Media *source,const IfsFsHostRuntimeV2 *runtime,
                     close(scratch.fd);return -1;
                 }
             }
+            if(policy==0u && boundary==3u) {
+                /* Corrupt the durable journal, not a live file. A bad
+                 * digest must stop the cold mount without replay writes. */
+                unsigned char marker[80],saved,damaged;
+                if(pread(scratch.fd,marker,sizeof(marker),0)!=(ssize_t)sizeof(marker)) {
+                    close(scratch.fd);return -1;
+                }
+                uint32_t first=(uint32_t)marker[8]|((uint32_t)marker[9]<<8)|
+                    ((uint32_t)marker[10]<<16)|((uint32_t)marker[11]<<24);
+                uint64_t at=(uint64_t)first*4096u+17u;
+                if(!first || at>=scratch.bytes || pread(scratch.fd,&saved,1u,(off_t)at)!=1) {
+                    close(scratch.fd);return -1;
+                }
+                damaged=(unsigned char)(saved^0x80u);
+                unsigned before=scratch.writes;
+                if(pwrite(scratch.fd,&damaged,1u,(off_t)at)!=1 || fsync(scratch.fd) ||
+                   core->mount(&h,&mount,&info)!=IFS_FS_CORRUPT || mount ||
+                   scratch.writes!=before ||
+                   pwrite(scratch.fd,&saved,1u,(off_t)at)!=1 || fsync(scratch.fd)) {
+                    close(scratch.fd);return -1;
+                }
+            }
             if(core->mount(&h,&mount,&info)!=IFS_FS_OK || !mount ||
                map->recover(mount,0u,&repaired)!=IFS_FS_OK ||
                repaired!=(boundary>=3u && boundary<=7u?1u:0u) ||
