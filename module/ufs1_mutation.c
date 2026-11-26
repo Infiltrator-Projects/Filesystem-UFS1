@@ -1005,9 +1005,11 @@ int ufs1_relocation_execute(Ufs1Mutation *w,Ufs1RelocationPlan *p,uint64_t *move
     if(rc!=IFS_FS_OK)goto done;
     memcpy(marker,redo_magic,sizeof(redo_magic));
     put32(marker+8u,p->journal_first);put32(marker+12u,l.bytes);
-    if(!SHA256(images,l.bytes,marker+16u) || !SHA256(marker,48u,marker+48u)){
+    uint8_t marker_hash[SHA256_DIGEST_LENGTH];
+    if(!SHA256(images,l.bytes,marker+16u) || !SHA256(marker,48u,marker_hash)){
         rc=IFS_FS_IO_ERROR;goto done;
     }
+    memcpy(marker+48u,marker_hash,sizeof(marker_hash));
     published=1; /* even a failed locator write requires a cold check */
     rc=wr(w,0u,marker,h->logical_sector_bytes);
     if(rc==IFS_FS_OK)rc=barrier(w);

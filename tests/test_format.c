@@ -9,7 +9,8 @@
 #include <unistd.h>
 #include <dlfcn.h>
 #include <sys/random.h>
-typedef struct {int fd;uint32_t sector;uint64_t bytes;unsigned writes;} Media;
+#include <sys/wait.h>
+typedef struct {int fd;uint32_t sector;uint64_t bytes;unsigned writes,flushes,stop_after;} Media;
 static int rd(void *ctx,uint64_t at,void *p,uint32_t n)
 {
     Media *m=ctx;
@@ -23,11 +24,116 @@ static int wr(void *ctx,uint64_t at,const void *p,uint32_t n)
     ++m->writes;
     return pwrite(m->fd,p,n,(off_t)at)==(ssize_t)n?0:-1;
 }
-static int flush(void *ctx){return fsync(((Media*)ctx)->fd);}
+static int flush(void *ctx)
+{
+    Media *m=ctx;
+    int rc=fsync(m->fd);
+    if(!rc && m->stop_after && ++m->flushes==m->stop_after)_exit(86);
+    return rc;
+}
 static void *allocate(void *ctx,size_t n){(void)ctx;return malloc(n);}
 static void release(void *ctx,void *p){(void)ctx;free(p);}
 static int entropy(void *ctx,void *p,uint32_t n)
 {(void)ctx;return getrandom(p,n,0)==(ssize_t)n?0:-1;}
+
+/* Each boundary starts from an independent clone of the same fragmented
+ * native volume. Skip only all-zero chunks while copying a sparse image;
+ * the file content and geometry are exact. Crash from the actual host
+ * flush callback, not a simulated successful return. */
+static int clone_image(const Media *source,Media *dest)
+{
+    char path[]="/tmp/ufs1-redo-XXXXXX";
+    *dest=*source;dest->fd=mkstemp(path);dest->writes=dest->flushes=dest->stop_after=0;
+    if(dest->fd<0)return -1;
+    unlink(path);
+    if(ftruncate(dest->fd,(off_t)dest->bytes))goto fail;
+    unsigned char *data=malloc(1024u*1024u);
+    if(!data)goto fail;
+    for(uint64_t at=0u;at<source->bytes;) {
+        size_t n=(source->bytes-at>1024u*1024u)?1024u*1024u:(size_t)(source->bytes-at);
+        if(pread(source->fd,data,n,(off_t)at)!=(ssize_t)n){free(data);goto fail;}
+        size_t i=0u;while(i<n && !data[i])++i;
+        if(i<n && pwrite(dest->fd,data,n,(off_t)at)!=(ssize_t)n){free(data);goto fail;}
+        at+=n;
+    }
+    free(data);
+    if(fsync(dest->fd))goto fail;
+    return 0;
+fail:
+    close(dest->fd);dest->fd=-1;return -1;
+}
+static int check_payload(const IfsFsCoreOpsV2 *core,void *mount,
+                         uint32_t block,const unsigned char *data)
+{
+    unsigned char actual[65536];
+    for(uint32_t i=0;i<14u;++i)
+        if(core->read(mount,"/alpha",(uint64_t)i*block,actual,block)!=IFS_FS_OK ||
+           memcmp(actual,data,block))return -1;
+    if(core->read(mount,"/tiny",0u,actual,block/2u+1u)!=IFS_FS_OK ||
+       memcmp(actual,data,block/2u+1u))return -1;
+    if(core->read(mount,"/beta",0u,actual,block)!=IFS_FS_OK ||
+       memcmp(actual,data,block))return -1;
+    if(core->read(mount,"/edge",0u,actual,1u)!=IFS_FS_OK || actual[0]!=data[0])return -1;
+    return 0;
+}
+static int crash_recovery(const Media *source,const IfsFsHostRuntimeV2 *runtime,
+                          const IfsFsCoreOpsV2 *core,const IfsFsDefragOpsV2 *map,
+                          uint32_t block,const unsigned char *data)
+{
+    for(uint32_t policy=0u;policy<=10u;policy+=10u) {
+        for(unsigned boundary=1u;boundary<=8u;++boundary) {
+            Media scratch;
+            if(clone_image(source,&scratch))return -1;
+            IfsFsHostRuntimeV2 h=*runtime;h.context=&scratch;
+            pid_t child=fork();
+            if(child==0) {
+                IfsFsVolumeInfoV2 info={.structure_bytes=sizeof(info)};
+                void *mount=NULL,*plan=NULL;uint64_t moved=0u;
+                if(core->mount(&h,&mount,&info)!=IFS_FS_OK ||
+                   map->plan(mount,"/",policy,&plan)!=IFS_FS_OK)_exit(87);
+                scratch.stop_after=boundary;scratch.flushes=0u;
+                (void)map->execute(mount,plan,&moved);_exit(87);
+            }
+            int status=0;
+            if(child<0 || waitpid(child,&status,0)!=child ||
+               !WIFEXITED(status) || WEXITSTATUS(status)!=86) {
+                fprintf(stderr,"UFS1 crash boundary not reached: policy %u barrier %u\n",policy,boundary);
+                close(scratch.fd);return -1;
+            }
+            void *mount=NULL;uint64_t repaired=0u,again=99u;
+            IfsFsVolumeInfoV2 info={.structure_bytes=sizeof(info)};
+            IfsFsHostRuntimeV2 ro=h;ro.capabilities=IFS_FS_HOST_READ_ONLY;
+            ro.write_at=NULL;ro.flush=NULL;
+            /* After durable locator publication and before clearing it,
+             * readers must refuse potentially half-published metadata. */
+            if(boundary>=3u && boundary<=7u) {
+                if(core->mount(&ro,&mount,&info)!=IFS_FS_BUSY || mount) {
+                    close(scratch.fd);return -1;
+                }
+            }
+            if(core->mount(&h,&mount,&info)!=IFS_FS_OK || !mount ||
+               map->recover(mount,0u,&repaired)!=IFS_FS_OK ||
+               repaired!=(boundary>=3u && boundary<=7u?1u:0u) ||
+               map->recover(mount,0u,&again)!=IFS_FS_OK || again ||
+               check_payload(core,mount,block,data) ||
+               core->unmount(mount)!=IFS_FS_OK) {
+                fprintf(stderr,"UFS1 recovery failed: policy %u barrier %u\n",policy,boundary);
+                close(scratch.fd);return -1;
+            }
+            mount=NULL;
+            if(core->mount(&ro,&mount,&info)!=IFS_FS_OK || !mount ||
+               check_payload(core,mount,block,data) ||
+               core->unmount(mount)!=IFS_FS_OK) {
+                close(scratch.fd);return -1;
+            }
+            printf("UFS1 cold recovery policy %u barrier %u repaired %llu PASS\n",
+                   policy,boundary,(unsigned long long)repaired);
+            close(scratch.fd);
+        }
+    }
+    return 0;
+}
+
 #define CHECK(x) do {if(!(x)){fprintf(stderr,"UFS1 format line %d: %s\n",__LINE__,#x);goto done;}}while(0)
 int main(int argc,char **argv)
 {
@@ -178,6 +284,7 @@ int main(int argc,char **argv)
     }
     CHECK(fragmented && logical==(uint64_t)14u*block);
     CHECK(core->unmount(mount)==IFS_FS_OK);
+    if(!large && m.sector==512u)CHECK(crash_recovery(&m,&h,core,map,block,data)==0);
     CHECK(core->mount(&h,&mount,&info)==IFS_FS_OK && mount);
     uint64_t repaired=99u,moved=0u;
     CHECK(map->recover(mount,0u,&repaired)==IFS_FS_OK && !repaired);
