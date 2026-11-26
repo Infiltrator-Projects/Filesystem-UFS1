@@ -45,7 +45,7 @@ def install_deps():
 
 # The source-first RUN fetches the pinned UFS1 revision, then this builder
 # fetches the exact Common revision used by CMake into its temporary checkout.
-COMMON_REVISION = "965e5d191a6f7d078f5d07218dbaabfb00fa1a20"
+COMMON_REVISION = "225e640ebed5351b1481bfbeef1a6144ca5146e7"
 COMMON_ROOT = ROOT / "backend-common"
 
 def prepare_release_source():
