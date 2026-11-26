@@ -29,8 +29,10 @@ The target installation is `/System/Filesystems/UFS1.so` and `/System/Resources/
 - [Provider implementation](module/ufs_module.c)
 - [Native design or source provenance](native/filesystems/ufs/DESIGN.md)
 - [Migration and source history](MIGRATION_STATUS.md)
-- [Original-format reference source](docs/UFS1.pages) and [PDF](docs/UFS1.pdf)
+- [Original-format reference source](docs/UFS1.pdfstreams) and [PDF](docs/UFS1.pdf)
 - [Project philosophy](docs/PHILOSOPHY.md)
 - [Common ABI](https://github.com/Infiltrator-Projects/Libraries)
 
 The original-format reference and historical migration notes describe different evidence from the current production provider. When descriptions disagree, the current exported descriptor, implementation, executable tests and exact-revision release evidence take precedence.
+
+The [engineering reference](docs/UFS1-TECHNICAL-REFERENCE.md) adds field-level original-format guidance. Earlier material is preserved in the PDF.
