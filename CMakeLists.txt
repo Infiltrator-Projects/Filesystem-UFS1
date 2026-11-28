@@ -92,10 +92,10 @@ add_custom_command(
  OUTPUT "${UFS1_GENERATED_PDF}"
  COMMAND "${Python3_EXECUTABLE}" "${CMAKE_CURRENT_SOURCE_DIR}/standalone/generate_manual.py"
          "${CMAKE_CURRENT_SOURCE_DIR}/VERSION"
-         "${CMAKE_CURRENT_SOURCE_DIR}/docs/UFS1.pages"
+         "${CMAKE_CURRENT_SOURCE_DIR}/docs/UFS1.pdfstreams"
          "${UFS1_GENERATED_PDF}"
  DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/VERSION"
-         "${CMAKE_CURRENT_SOURCE_DIR}/docs/UFS1.pages"
+         "${CMAKE_CURRENT_SOURCE_DIR}/docs/UFS1.pdfstreams"
          "${CMAKE_CURRENT_SOURCE_DIR}/standalone/manual.py"
          "${CMAKE_CURRENT_SOURCE_DIR}/standalone/generate_manual.py"
  VERBATIM)

@@ -10,7 +10,7 @@ from manual import build
 
 def main() -> None:
     if len(sys.argv) != 4:
-        raise SystemExit("Usage: generate_manual.py VERSION_FILE PAGES_FILE OUTPUT_PDF")
+        raise SystemExit("Usage: generate_manual.py VERSION_FILE PDFSTREAMS_FILE OUTPUT_PDF")
     version = Path(sys.argv[1]).read_text(encoding="utf-8").strip()
     if not re.fullmatch(r"[0-9]+\.[0-9]+\.[0-9]+", version):
         raise SystemExit("Invalid filesystem version")
